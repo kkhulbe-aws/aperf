@@ -5,6 +5,7 @@ pub mod data;
 pub mod pmu;
 pub mod record;
 pub mod report;
+pub mod spe;
 pub mod utils;
 pub mod visualizer;
 use anyhow::Result;

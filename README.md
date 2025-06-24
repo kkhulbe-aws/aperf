@@ -24,6 +24,7 @@ APerf collects the following performance data:
 - Meminfo
 - Profile data (if enabled with `--profile` and `perf` binary present)
 - JVM profile data with [async-profiler](https://github.com/async-profiler/async-profiler/tree/master) binary
+- In-memory statistics from ARM SPE for long profiles
 
 ## Requirements
 * [Rust toolchain (v1.61.0+)](https://www.rust-lang.org/tools/install)
@@ -40,6 +41,28 @@ Download the binary from the [Releases](https://github.com/aws/APerf/releases) p
 
 ```
 cargo build
+cargo test
+```
+
+3. To build APerf with in-memory SPE support, you'll need the following development packages installed. On Debian/Ubuntu systems, you can install them using:
+
+```bash
+sudo apt-get install \
+    libdw-dev        # For elfutils/libdw support
+    libelf-dev       # For ELF file handling
+    libcapstone-dev  # For disassembly support
+    zlib1g-dev       # For compression support
+    liblzma-dev      # For LZMA compression
+    libbz2-dev       # For BZ2 compression
+    libzstd-dev      # For Zstandard compression
+```
+
+4. You will also need to have SPE drivers installed on the machine under test.
+
+5. Run the following commands
+
+```
+cargo build --features spe
 cargo test
 ```
 
@@ -80,6 +103,15 @@ To compare the results of two different performance runs, use the following comm
 ```
 ./aperf custom-pmu
 ```
+
+**aperf spe**
+1. Download the `aperf` binary. Ensure it has in-memory spe support enabled.
+2. Start `aperf spe`
+```
+./aperf spe -r <RUN_NAME> -n <NUM_CPU> -p <PERIOD> -s <SPE_PERIOD> -x <TIMEOUT> -y <THROTTLE>
+```
+3. This will generate the reports in the specified directory, that can then be downloaded and viewed.
+
 ### Example
 To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 
@@ -134,6 +166,28 @@ To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 `--verify` Verify the supplied PMU file
 
 `./aperf custom-pmu -h`
+
+**ARM-SPE Flags:**
+
+`-r, --run-name` run name (name of the run for organization purposes, creates directory of the same name, default of aperf_[timestamp])
+
+`-n, --num-cpu` number of CPUs to profile from. ID will be from `0` to `n-1`
+
+`-p, --period` wake up period (ms)
+
+`-s, --spe-period` ARM SPE sampling period (cycles)
+
+`-v, --verbose` verbose messages
+
+`-x, --timeout` how long to run the profile
+
+`-t, --tmp-dir` temporary directory for the intemediate files (CURRENTLY UNUSED)
+
+`-y, --throttle` toggle throttling data for lowering CPU utilization
+
+`-h, --help` print help
+
+`-V, --version` print version
 
 ## APerf Issues?
 Below are some prerequisites for profiling with APerf:
