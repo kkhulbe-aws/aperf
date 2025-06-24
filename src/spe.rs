@@ -52,10 +52,15 @@ pub struct SPE {
     /// increased CPU usage.
     #[clap(short = 'y', long, value_parser, default_value_t = 0)]
     pub throttle: u8,
+
+    /// Verbose
+    #[clap(short, long, value_parser, default_value_t = 0)]
+    pub verbose: u8,
 }
 
 #[cfg(feature = "spe")]
 pub fn spe(record: &SPE, tmp_dir: &Path, runlog: &Path) -> Result<()> {
+
     let mut run_name = String::new();
     if record.period == 0 {
         error!("Wakeup period cannot be 0.");
@@ -73,13 +78,16 @@ pub fn spe(record: &SPE, tmp_dir: &Path, runlog: &Path) -> Result<()> {
 
     let mut params = InitParams::new(run_name);
     fs::create_dir(params.dir_name.clone())?;
-    println!("Run name: {:?}", params.dir_name);
     params.period = record.period;
     params.tmp_dir = tmp_dir.to_path_buf();
     params.runlog = runlog.to_path_buf();
 
     unsafe {
         env::set_var("HOTLINE_DIR", params.dir_name);
+    }
+
+    unsafe {
+        env::set_var("HOTLINE_VERBOSE", record.verbose.to_string());
     }
 
     // create the argument strings

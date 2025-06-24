@@ -21,6 +21,8 @@ extern int build_report();
 #define PATH_MAX 512
 #endif
 
+#define VERBOSE_SET get_hotline_verbose()
+
 /**
  * On every event loop:
  * 1. Iterate through record buffer
@@ -74,6 +76,14 @@ extern int build_report();
 const char* get_hotline_dir() {
     const char* env_dir = getenv("HOTLINE_DIR");
     return env_dir ? env_dir : HOTLINE_DIR;
+}
+
+int get_hotline_verbose() {
+    const char* env_dir = getenv("HOTLINE_VERBOSE");
+    if (env_dir != NULL) {
+        return atoi(env_dir);
+    }
+    return 0;
 }
 
 void print_progress_bar(int percentage) {
@@ -184,8 +194,13 @@ int hotline_main(int argc, char *argv[])
     printf("\tDirectory: %s\n", get_hotline_dir());
 
     configure_all_pmus(pmus, &config);
+if(VERBOSE_SET) 
+    printf("PMUs configured.\n");
+
     reset_all_pmus(pmus, &config);
-    enable_all_pmus(pmus, &config);
+if(VERBOSE_SET) 
+    printf("PMUs reset.\n");
+
     struct spe_stats stats;
     memset(&stats, 0, sizeof(struct spe_stats));
 
@@ -194,9 +209,20 @@ int hotline_main(int argc, char *argv[])
         configure_cpu_session(&sessions[i], &pmus[i]);
     }
 
+if(VERBOSE_SET)
+    printf("CPU sessions have been set up.\n");
+
     // set up btree
     vm_spe_tr = btree_new(sizeof(struct vm_spe_btree_entry), 0, vm_spe_btree_compare, NULL);
     btree_clear(vm_spe_tr);
+
+if(VERBOSE_SET)
+    printf("B-Tree setup.\n");
+
+    enable_all_pmus(pmus, &config);
+
+if(VERBOSE_SET)
+    printf("Profiling has begun.\n");
 
     // initialize mapping table and read /proc/map to get all currently running processes
     // this is needed as currently running processes do not generate MMAP2 records
@@ -219,7 +245,7 @@ int hotline_main(int argc, char *argv[])
             heap_entries += drain_heap(&sessions[i]);
         }
 
-#ifdef DEBUG
+if(VERBOSE_SET) {
         printf("SPE Stats:\n");
         printf("\taux_events: %ld\n", stats.aux_events);
         printf("\titrace: %ld\n", stats.itrace_events);
@@ -229,14 +255,13 @@ int hotline_main(int argc, char *argv[])
         printf("\tdrained heap size: %lu\n", heap_entries);
         printf("\tbtree size: %lu\n", btree_count(vm_spe_tr));
         printf("\tmapping table size: %lu\n", get_pid_maps_table_size(mapping_table));
-#endif
+}
     }
     print_progress_bar(100); // just for satisfaction :)
     disable_all_pmus(pmus, &config);
 
-#ifdef DEBUG
+if(VERBOSE_SET)
     printf("Disabled.\n");
-#endif
 
     printf("\nProfiling complete. Dumping data.\n");
     commit_to_file();
