@@ -79,6 +79,8 @@ struct cpu_session
     pid_t pid; // most recent pid that we switched to
     heap ordered_samples;
     struct perf_tsc_conversion conv;
+    uint64_t last_aux_tail, last_record_tail;
+    uint64_t last_aux_ts, last_record_ts;
 };
 
 extern long configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *config);

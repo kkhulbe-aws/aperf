@@ -4,6 +4,7 @@
 #include "vm_spe_btree.h"
 #include "btree.h"
 #include "mmap_table.h"
+#include <stdatomic.h>
 
 // global data structures independent of sessions
 struct btree *vm_spe_tr;
@@ -20,8 +21,6 @@ extern int build_report();
 #ifndef PATH_MAX
 #define PATH_MAX 512
 #endif
-
-#define VERBOSE_SET get_hotline_verbose()
 
 /**
  * On every event loop:
@@ -67,36 +66,39 @@ extern int build_report();
  * the current pid is (hence the PERF_RECORD_SWITCH_CPU_WIDE records), and a mapping structure for the virtual address
  * offsets. To ensure proper time ordering, everything is inserted into the heap, pulled out, and processed in the corresponding
  * data structures.
- * 
+ *
  * On some workloads (particularly those that just hammer the memory modules), CPU usage increases due to context switching and large amounts
  * of events being generated. In the worst case, it increases to 10-11%. To mitigate this, the --throttle flag allows the tool to throttle records.
  * The tool throttles the record buffer at 64000 records / second. This is divided by the number of CPUs to ensure that this throttle amount is met.
  */
 
-const char* get_hotline_dir() {
-    const char* env_dir = getenv("HOTLINE_DIR");
+const char *get_hotline_dir()
+{
+    const char *env_dir = getenv("HOTLINE_DIR");
     return env_dir ? env_dir : HOTLINE_DIR;
 }
 
-int get_hotline_verbose() {
-    const char* env_dir = getenv("HOTLINE_VERBOSE");
-    if (env_dir != NULL) {
-        return atoi(env_dir);
-    }
-    return 0;
+int get_hotline_verbose()
+{
+    return 1;
 }
 
-void print_progress_bar(int percentage) {
+void print_progress_bar(int percentage)
+{
     printf("\rProgress: [");
-    for (int i = 0; i < 50; i++) {
-        if (i < percentage/2) {
+    for (int i = 0; i < 50; i++)
+    {
+        if (i < percentage / 2)
+        {
             printf("=");
-        } else {
+        }
+        else
+        {
             printf(" ");
         }
     }
     printf("] %d%%", percentage);
-    fflush(stdout);  // Important to flush the output
+    fflush(stdout); // Important to flush the output
 }
 
 void commit_to_file()
@@ -194,12 +196,10 @@ int hotline_main(int argc, char *argv[])
     printf("\tDirectory: %s\n", get_hotline_dir());
 
     configure_all_pmus(pmus, &config);
-if(VERBOSE_SET) 
-    printf("PMUs configured.\n");
+    // printf("PMUs configured.\n");
 
     reset_all_pmus(pmus, &config);
-if(VERBOSE_SET) 
-    printf("PMUs reset.\n");
+    // printf("PMUs reset.\n");
 
     struct spe_stats stats;
     memset(&stats, 0, sizeof(struct spe_stats));
@@ -209,59 +209,65 @@ if(VERBOSE_SET)
         configure_cpu_session(&sessions[i], &pmus[i]);
     }
 
-if(VERBOSE_SET)
-    printf("CPU sessions have been set up.\n");
+    // printf("CPU sessions have been set up.\n");
 
     // set up btree
     vm_spe_tr = btree_new(sizeof(struct vm_spe_btree_entry), 0, vm_spe_btree_compare, NULL);
     btree_clear(vm_spe_tr);
 
-if(VERBOSE_SET)
-    printf("B-Tree setup.\n");
+    // printf("B-Tree setup.\n");
 
     enable_all_pmus(pmus, &config);
 
-if(VERBOSE_SET)
-    printf("Profiling has begun.\n");
+    // printf("Profiling has begun.\n");
 
     // initialize mapping table and read /proc/map to get all currently running processes
     // this is needed as currently running processes do not generate MMAP2 records
     mapping_table = init_pid_maps();
     get_initial_mappings(mapping_table);
 
-    uint64_t iters = config.timeout / ((double) config.period / 1000);
+    uint64_t iters = config.timeout / ((double)config.period / 1000);
     // main event loop
     for (int itr = 0; itr < iters; itr++)
-    {   
-        print_progress_bar(itr * 100 / iters);
+    {
+        // Ensure sleep is completed before proceeding
+        atomic_thread_fence(memory_order_seq_cst);
         usleep(1000 * config.period);
+        atomic_thread_fence(memory_order_seq_cst);
 
-        uint64_t heap_entries = 0;
+        volatile uint64_t heap_entries = 0;
+
+        // fence before PMU operations
+        __sync_synchronize();
 
         for (int i = 0; i < config.num_cpu; i++)
         {
+            __asm__ __volatile__("" ::: "memory");
+            // traverse_buffers(&pmus[i], &sessions[i]);
             process_record_buffer(&pmus[i], &stats, &sessions[i], config.num_cpu, config.period, config.throttle);
             process_record_aux(&pmus[i], &sessions[i], config.num_cpu, config.period, config.throttle);
             heap_entries += drain_heap(&sessions[i]);
+
+            // force completion of PMU operations
+            __sync_synchronize();
+            atomic_thread_fence(memory_order_seq_cst);
+
+            // ARM-specific memory barrier
+            __asm__ __volatile__("dmb ish" ::: "memory");
         }
 
-if(VERBOSE_SET) {
-        printf("SPE Stats:\n");
-        printf("\taux_events: %ld\n", stats.aux_events);
-        printf("\titrace: %ld\n", stats.itrace_events);
-        printf("\tcontext_switch: %ld\n", stats.switch_cpu_wide_events);
-        printf("\tmmap2: %ld\n", stats.mmap2_events);
-        printf("\texit: %ld\n", stats.exit_events);
-        printf("\tdrained heap size: %lu\n", heap_entries);
-        printf("\tbtree size: %lu\n", btree_count(vm_spe_tr));
-        printf("\tmapping table size: %lu\n", get_pid_maps_table_size(mapping_table));
-}
+        __sync_synchronize();
+        atomic_thread_fence(memory_order_seq_cst);
     }
-    print_progress_bar(100); // just for satisfaction :)
+
+    // ensure all operations complete before disabling PMUs
+    __sync_synchronize();
+    atomic_thread_fence(memory_order_seq_cst);
+    print_progress_bar(100);
     disable_all_pmus(pmus, &config);
 
-if(VERBOSE_SET)
-    printf("Disabled.\n");
+
+    // printf("Disabled.\n");
 
     printf("\nProfiling complete. Dumping data.\n");
     commit_to_file();

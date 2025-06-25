@@ -235,6 +235,9 @@ extern uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc);
 extern int is_valid(enum perf_event_type type, void *record);
 extern bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry);
 
+extern void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session);
+extern void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session, uint64_t ts);
+
 extern struct btree *vm_spe_tr;
 extern struct pid_maps_table *mapping_table;
 

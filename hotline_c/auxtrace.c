@@ -244,6 +244,179 @@ uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc)
            ((rem * tc->time_mult) >> tc->time_shift);
 }
 
+void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session, uint64_t target_ts)
+{
+    char *data_page = ((char *)pmu->meta_page) + PAGE_SIZE;
+    uint64_t data_head = pmu->meta_page->data_head;
+    uint64_t data_tail = session->last_record_tail; // use session's last position
+    uint64_t data_size = pmu->meta_page->data_size;
+    uint64_t last_ts = session->last_record_ts;
+
+    // ensure we don't read past the head
+    while (data_tail < data_head) 
+    {
+        // check if we have enough space for at least a header
+        if (data_tail + sizeof(struct perf_event_header) > data_head) {
+            break;
+        }
+
+        struct perf_event_header *header = (struct perf_event_header *)(data_page + (data_tail % data_size));
+        
+        // validate header size
+        if (header->size == 0 || data_tail + header->size > data_head) {
+            break;
+        }
+
+        uint64_t current_ts = 0;
+
+        // extract timestamp based on record type
+        switch (header->type)
+        {
+        case PERF_RECORD_MMAP2:
+        {
+            struct mmap2_record *mmap2_rec = (struct mmap2_record *)header;
+            size_t fixed_size = offsetof(struct mmap2_record, filename);
+            size_t filename_len = header->size - fixed_size - sizeof(struct sample_id);
+            struct sample_id *sid = (struct sample_id *)((char *)mmap2_rec + fixed_size + filename_len);
+            current_ts = sid->time;
+            break;
+        }
+        case PERF_RECORD_SWITCH_CPU_WIDE:
+        {
+            struct switch_cpu_wide *switch_rec = (struct switch_cpu_wide *)header;
+            current_ts = switch_rec->sid.time;
+            break;
+        }
+        case PERF_RECORD_EXIT:
+        {
+            struct process_exit *exit = (struct process_exit *)header;
+            current_ts = exit->sid.time;
+            break;
+        }
+        default:
+            // skip unknown record types
+            data_tail += header->size;
+            continue;
+        }
+
+        // stop if we've reached a timestamp greater than our target
+        if (current_ts > target_ts) {
+            break;
+        }
+
+        // update last_ts if we have a valid timestamp
+        if (current_ts > last_ts) {
+            last_ts = current_ts;
+        }
+
+        // process the record based on its type
+        switch (header->type)
+        {
+        case PERF_RECORD_MMAP2:
+        {
+            struct mmap2_record *mmap2_rec = (struct mmap2_record *)header;
+            size_t fixed_size = offsetof(struct mmap2_record, filename);
+            size_t filename_len = header->size - fixed_size - sizeof(struct sample_id);
+
+            struct ordered_sample *os = (struct ordered_sample *)malloc(sizeof(struct ordered_sample));
+            if (!os) {
+                // handle allocation failure
+                goto next_record;
+            }
+
+            memcpy(&(os->sample.mmap2_entry), mmap2_rec, fixed_size);
+
+            if (filename_len > 0) {
+                char filename[filename_len + 1];
+                memcpy(filename, ((char *)mmap2_rec) + fixed_size, filename_len);
+                filename[filename_len] = '\0';  // ensure null termination
+                os->sample.mmap2_entry.file_id = add_global_filename(filename);
+            }
+
+            os->type = PERF_RECORD_MMAP2;
+            handle_mmap2_record(mapping_table, (struct mmap2_mapping *)&os->sample.mmap2_entry);
+            free(os);
+            break;
+        }
+
+        case PERF_RECORD_SWITCH_CPU_WIDE:
+        {
+            struct switch_cpu_wide *switch_rec = (struct switch_cpu_wide *)header;
+            if (switch_rec->header.misc & PERF_RECORD_MISC_SWITCH_OUT) {
+                if (switch_rec->next_prev_pid >= 0 && switch_rec->next_prev_pid < ((2 << 21) - 1)) {
+                    session->pid = switch_rec->next_prev_pid;
+                }
+            }
+            break;
+        }
+
+        case PERF_RECORD_EXIT:
+        {
+            struct process_exit *exit = (struct process_exit *)header;
+            free_pid_maps(mapping_table, exit->pid);
+            break;
+        }
+        }
+
+next_record:
+        data_tail += header->size;
+        asm volatile("dmb ishld" ::: "memory"); // memory barrier for reading
+    }
+
+    // update session state
+    session->last_record_ts = last_ts;
+    session->last_record_tail = data_tail;
+    pmu->meta_page->data_tail = data_tail;
+}
+
+void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session)
+{
+    void *aux = pmu->aux_buffer;
+    uint64_t aux_size = pmu->meta_page->aux_size;
+    uint64_t aux_head = pmu->meta_page->aux_head;
+    uint64_t aux_tail = session->last_aux_tail;
+
+    uint64_t last_processed_ts = 0;
+
+    // ensure we don't read past the head
+    while (aux_tail + sizeof(struct spe_record) <= aux_head)
+    {
+        struct spe_record *record = (struct spe_record *)(aux + (aux_tail % aux_size));
+        
+        // extract timestamp
+        uint8_t *ts = record->timestamp;
+        uint64_t timestamp = (uint64_t)ts[0] |
+                           ((uint64_t)ts[1] << 8) |
+                           ((uint64_t)ts[2] << 16) |
+                           ((uint64_t)ts[3] << 24) |
+                           ((uint64_t)ts[4] << 32) |
+                           ((uint64_t)ts[5] << 40) |
+                           ((uint64_t)ts[6] << 48) |
+                           ((uint64_t)ts[7] << 56);
+
+        uint64_t perf_ts = tsc_to_perf_time(timestamp, &session->conv);
+        
+        // only process if this timestamp is greater than our last processed timestamp
+        if (perf_ts >= last_processed_ts) {
+            struct aux_entry entry;
+            parse_record(record, &entry);
+
+            // process all records up to this timestamp
+            upgrade_ts(pmu, session, perf_ts);
+            
+            // process the aux record itself
+            handle_aux_record(session, &entry);
+            
+            last_processed_ts = perf_ts;
+        }
+
+        aux_tail += sizeof(struct spe_record);
+        session->last_aux_tail = aux_tail;
+        pmu->meta_page->aux_tail = aux_tail;
+        asm volatile("dmb ishld" ::: "memory"); // read memory fence
+    }
+}
+
 // this is the main loop to process all the heap entries. Currently
 // an expensive operation due to large amounts of context switch records
 // but we can improve on this by inserting less switch records, at the cost
