@@ -1,10 +1,18 @@
 #include "config.h"
 
+long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+                            int cpu, int group_fd, unsigned long flags)
+{
+    int ret;
+    ret = syscall(SYS_perf_event_open, hw_event, pid, cpu, group_fd, flags);
+    return ret;
+}
+
 void parse_arguments(int argc, char *argv[], struct arg_config *config)
 {
     config->period = DEFAULT_PERIOD;
     config->spe_period = DEFAULT_SPE_PERIOD;
-    config->num_cpu = DEFAULT_NUM_CPU;
+    config->num_cpu = sysconf(_SC_NPROCESSORS_ONLN);;
     config->load_filter = DEFAULT_LOAD_FILTER;
     config->timeout = DEFAULT_TIMEOUT;
     config->throttle = 0; // no throttling by default
@@ -42,16 +50,20 @@ void parse_arguments(int argc, char *argv[], struct arg_config *config)
             break;
         case 'r':
             config->throttle = atoi(optarg);
+            break;
         case '?':
+            printf("Usage: ./<BINARY> --period X --spe_period X --num_cpu X --timeout X");
             break;
         default:
+            printf("Invalid command provided.");
+            printf("Usage: ./<BINARY> --period X --spe_period X --num_cpu X --timeout X");
             exit(EXIT_FAILURE);
         }
     }
 }
 
 // spe configurations were determined through several `strace` runs on `perf record`
-long configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *config)
+configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *config)
 {
     long fd;
     struct perf_event_attr attr;
@@ -72,10 +84,6 @@ long configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *
     attr.branch_sample_type = PERF_SAMPLE_BRANCH_ANY;
     attr.config2 = config->load_filter;
 
-#ifdef DEBUG
-    printf("SPE event configured on CPU %d\n", cpu);
-#endif
-
     fd = perf_event_open(&attr, -1, cpu, -1, PERF_FLAG_FD_CLOEXEC);
     if (fd == -1)
     {
@@ -84,11 +92,9 @@ long configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *
     }
     pmu->fd = fd;
     pmu->cpu = cpu;
-
-    return 0;
 }
 
-long mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu)
+void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu)
 {
     struct perf_event_mmap_page *meta_page = NULL;
     if ((meta_page = (struct perf_event_mmap_page *)mmap(NULL,
@@ -114,11 +120,9 @@ long mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu)
     pmu->meta_page = meta_page;
     pmu->data_buffer = (char *)meta_page + PAGE_SIZE;
     pmu->aux_buffer = aux_buffer;
-
-    return 0;
 }
 
-extern long configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *config)
+extern void configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *config)
 {
     struct perf_event_attr attr;
     long fd;
@@ -151,78 +155,65 @@ extern long configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *c
         exit(EXIT_FAILURE);
     }
     pmu->software_fd = fd;
-    return 0;
 }
 
 // configure both hardware and software file descriptors for CPUs, mmap buffers for them, then configure them to be non-blocking
-long configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
+void configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
 {
+    int ret;
     for (int i = 0; i < config->num_cpu; i++)
     {
         configure_ARM_SPE_cpu(i, &pmus[i], config);
         configure_software_PMU(&pmus[i], config);
         mmap_ARM_SPE_cpu(&pmus[i]);
-        fcntl(pmus[i].fd, F_SETFL, O_RDONLY | O_NONBLOCK);
-        ioctl(pmus[i].software_fd, PERF_EVENT_IOC_SET_OUTPUT, pmus[i].fd);
-        fcntl(pmus[i].software_fd, F_SETFL, O_RDONLY | O_NONBLOCK);
+        ret = fcntl(pmus[i].fd, F_SETFL, O_RDONLY | O_NONBLOCK);
+        if (ret == -1) exit(EXIT_FAILURE);
+        ret = ioctl(pmus[i].software_fd, PERF_EVENT_IOC_SET_OUTPUT, pmus[i].fd);
+        if (ret == -1) exit(EXIT_FAILURE);
+        ret = fcntl(pmus[i].software_fd, F_SETFL, O_RDONLY | O_NONBLOCK);
+        if (ret == -1) exit(EXIT_FAILURE);
     }
-
-    return 0;
 }
 
-long toggle_pmu(struct arm_spe_pmu *pmu, uint64_t toggle)
+void toggle_pmu(struct arm_spe_pmu *pmu, uint64_t toggle)
 {
     int ret;
     ret = ioctl(pmu->fd, PERF_EVENT_IOC_ENABLE, 0);
     if (ret == -1)
     {
         fprintf(stderr, "toggle failed on hardware PMU");
+        exit(EXIT_FAILURE);
     }
     ret = ioctl(pmu->software_fd, PERF_EVENT_IOC_ENABLE, 0);
     if (ret == -1)
     {
         fprintf(stderr, "toggle failed on software PMU");
+        exit(EXIT_FAILURE);
     }
-    return 0;
 }
 
-long enable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
+void enable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
 {
     for (int i = 0; i < config->num_cpu; i++)
     {
         toggle_pmu(&pmus[i], PERF_EVENT_IOC_ENABLE);
     }
-
-#ifdef DEBUG
-    printf("All pmus enabled\n");
-#endif
-    return 0;
 }
 
-long disable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
+void disable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
 {
     for (int i = 0; i < config->num_cpu; i++)
     {
         toggle_pmu(&pmus[i], PERF_EVENT_IOC_DISABLE);
     }
-
-#ifdef DEBUG
-    printf("All pmus disabled\n");
-#endif
-    return 0;
 }
 
-long reset_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
+void reset_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
 {
     for (int i = 0; i < config->num_cpu; i++)
     {
-        toggle_pmu(&pmus[i], PERF_EVENT_IOC_DISABLE);
+        toggle_pmu(&pmus[i], PERF_EVENT_IOC_RESET);
     }
-
-#ifdef DEBUG
-    printf("All pmus reset\n");
-#endif
-    return 0;
 }
 
 void configure_cpu_session(struct cpu_session *session, struct arm_spe_pmu *pmu)
@@ -234,9 +225,6 @@ void configure_cpu_session(struct cpu_session *session, struct arm_spe_pmu *pmu)
     session->conv.time_mult = pmu->meta_page->time_mult;
     session->conv.time_shift = pmu->meta_page->time_shift;
     session->conv.time_zero = pmu->meta_page->time_zero;
-
-    heap_create(&session->ordered_samples, 0, compare_uint64_keys);
-
     session->pid = 0; // maybe switch to calling process?
     session->last_aux_ts = 0;
     session->last_aux_tail = 0;

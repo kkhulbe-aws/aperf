@@ -1,6 +1,5 @@
 #include "config.h"
 #include "auxtrace.h"
-#include "heap.h"
 #include "vm_spe_btree.h"
 #include "btree.h"
 #include "mmap_table.h"
@@ -17,10 +16,6 @@ size_t global_filename_count = 0;
 struct pid_maps_table *mapping_table;
 
 extern int build_report();
-
-#ifndef HOTLINE_DIR
-#define HOTLINE_DIR "/home/ubuntu/hotline"
-#endif
 
 #ifndef PATH_MAX
 #define PATH_MAX 512
@@ -75,13 +70,13 @@ extern int build_report();
 const char *get_hotline_dir()
 {
     const char *env_dir = getenv("HOTLINE_DIR");
-    return env_dir ? env_dir : HOTLINE_DIR;
+    return env_dir ? env_dir : "";
 }
 
 const char *get_hotline_report_dir()
 {
     const char *env_dir = getenv("HOTLINE_REPORT_DIR");
-    return env_dir ? env_dir : HOTLINE_DIR;
+    return env_dir ? env_dir : "";
 }
 
 

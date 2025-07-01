@@ -8,7 +8,6 @@
 #include <string.h>
 #include <stddef.h>
 #include "config.h"
-#include "heap.h"
 #include "btree.h"
 #include <assert.h>
 #include "mmap_table.h"
@@ -223,11 +222,6 @@ struct ordered_sample
     } sample;
 };
 
-extern long process_record_buffer(struct arm_spe_pmu *pmu, struct spe_stats *stats, struct cpu_session *session, uint32_t num_cpu, uint32_t spe_period, uint8_t should_throttle);
-extern long drain_heap(struct cpu_session *session);
-
-// returns nonzero code if record was invalid or unable to be processed
-extern int process_record_aux(struct arm_spe_pmu *pmu, struct cpu_session *session, uint32_t num_cpu, uint32_t spe_period, uint8_t should_throttle);
 extern int process_record_mmap2(struct mmap2_record *record);
 
 // helpers

@@ -16,29 +16,20 @@
 #include <linux/perf_event.h>
 #include <errno.h>
 
-#include "heap.h"
-
-#define DEFAULT_PERIOD 1000         // in milliseconds
+#define DEFAULT_PERIOD 1000        // in milliseconds
 #define DEFAULT_SPE_PERIOD 2800000 // 1 kHz on Grv instances
-#define DEFAULT_NUM_CPU 64         // cg7.metal instances
 #define DEFAULT_LOAD_FILTER 0
-#define DEFAULT_TIMEOUT 60         // in seconds
+#define DEFAULT_TIMEOUT 60 // in seconds
 
 #define PERF_ARM_SPE_RAW_TYPE 0xc       // ARM specific type
 #define PERF_ARM_SPE_RAW_CONFIG 0x10001 // enable load collection, branch collection, and load filtering
 #define PERF_FORMAT_SPE 0x10
 
-// #define AUX_WATERMARK 64 // watermark notification for PERF_SAMPLE_AUX record generation
-// #define NUM_PAGES 64 * 2 // MUST be a power of two
-// #define PAGE_SIZE 4096
-// #define AUX_SIZE 131072 * 16
-// #define AUX_OFFSET 0x41000 * 16
-
 #define AUX_WATERMARK 64 // watermark notification for PERF_SAMPLE_AUX record generation
 #define PAGE_SIZE 4096
 #define NUM_PAGES 1024 // Increased from 128 to 1024
 #define DATA_SIZE (NUM_PAGES * PAGE_SIZE)
-#define AUX_SIZE (1024 * 1024 * 64) // 64 MB, increased from about 2 MB
+#define AUX_SIZE (1024 * 1024 * 64)        // 64 MB, increased from about 2 MB
 #define AUX_OFFSET (DATA_SIZE + PAGE_SIZE) // Ensure it's after data section and page-aligned
 
 struct arg_config
@@ -61,13 +52,8 @@ struct arm_spe_pmu
 
 extern void parse_arguments(int argc, char *argv[], struct arg_config *config);
 
-static long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
-                            int cpu, int group_fd, unsigned long flags)
-{
-    int ret;
-    ret = syscall(SYS_perf_event_open, hw_event, pid, cpu, group_fd, flags);
-    return ret;
-}
+extern long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
+                            int cpu, int group_fd, unsigned long flags);
 
 struct perf_tsc_conversion
 {
@@ -84,19 +70,19 @@ struct perf_tsc_conversion
 struct cpu_session
 {
     pid_t pid; // most recent pid that we switched to
-    heap ordered_samples;
     struct perf_tsc_conversion conv;
     uint64_t last_aux_tail, last_record_tail;
     uint64_t last_aux_ts, last_record_ts;
 };
 
-extern long configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *config);
-extern long mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu);
-extern long configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *config);
-extern long configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
-extern long enable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
-extern long disable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
-extern long reset_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
+extern void setup_default_variables();
+extern void configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *config);
+extern void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu);
+extern void configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *config);
+extern void configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
+extern void enable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
+extern void disable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
+extern void reset_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
 extern void configure_cpu_session(struct cpu_session *session, struct arm_spe_pmu *pmu);
 
 #endif // CONFIG_H_
