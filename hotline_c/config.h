@@ -77,7 +77,7 @@ struct cpu_session
 
 extern void setup_default_variables();
 extern void configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *config);
-extern void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu);
+extern void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config);
 extern void configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *config);
 extern void configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
 extern void enable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);

@@ -128,6 +128,7 @@ BinaryInfo *load_binary(const char *filename)
     {
         perror("open");
         cs_close(&info->cs_handle);
+        printf("nonfatal error. continuing...\n");
         free(info);
         return NULL;
     }
@@ -247,9 +248,9 @@ int init_debug_info(const char *filename)
     int fd = open(filename, O_RDONLY);
     if (fd < 0)
     {
-        printf("Failed to open ELF file: %s\n", strerror(errno));
         dwfl_end(debug_info.dwfl);
         cs_close(debug_info.cs_handle);
+        exit(EXIT_FAILURE);
         return -1;
     }
 
@@ -367,6 +368,7 @@ void process_branch_file(const char *filename, BranchEntry *entries, int *count)
     if (!fp)
     {
         printf("Error opening branch file %s: %s\n", filename, strerror(errno));
+        exit(EXIT_FAILURE);
         return;
     }
 
@@ -408,6 +410,7 @@ void process_completion_file(const char *filename, CompletionEntry *entries, int
     if (!fp)
     {
         printf("Error opening completion file %s: %s\n", filename, strerror(errno));
+        exit(EXIT_FAILURE);
         return;
     }
 
@@ -596,6 +599,7 @@ void generate_exec_latency_view(CompletionEntry *completions, int completion_cou
     if (!fp)
     {
         printf("Error creating exec_latency_view.csv: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
         return;
     }
 
@@ -651,6 +655,7 @@ void generate_issue_latency_view(CompletionEntry *completions, int completion_co
     if (!fp)
     {
         printf("Error creating issue_latency_view.csv: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
         return;
     }
 
@@ -706,6 +711,7 @@ void generate_x_latency_view(CompletionEntry *completions, int completion_count)
     if (!fp)
     {
         printf("Error creating x.csv: %s\n", strerror(errno));
+        exit(EXIT_FAILURE);
         return;
     }
 
@@ -906,9 +912,11 @@ int build_report()
 
     // Create output directory
     create_output_directory();
+    printf("Created ouptut dir\n");
 
     // Generate views
     generate_exec_latency_view(completion_entries, completion_count);
+    printf("generated exec lat view\n");
     generate_issue_latency_view(completion_entries, completion_count);
     generate_x_latency_view(completion_entries, completion_count);
     generate_branch_view(branch_entries, branch_count);

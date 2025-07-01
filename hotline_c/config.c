@@ -1,4 +1,18 @@
 #include "config.h"
+#include <math.h>
+
+uint64_t get_num_pages(uint64_t spe_period, uint64_t period_ms) {
+    uint64_t samples_per_wakeup = (period_ms * 1000) / spe_period;
+
+    uint64_t base_pages = (uint64_t)ceil(samples_per_wakeup / 4.0);
+
+    uint64_t num_pages = 32;
+    while (num_pages < base_pages && num_pages < 256) {
+        num_pages *= 2;
+    }
+
+    return num_pages;
+}
 
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid,
                             int cpu, int group_fd, unsigned long flags)
@@ -94,11 +108,22 @@ configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *confi
     pmu->cpu = cpu;
 }
 
-void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu)
+void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config)
 {
+    uint64_t page_sz = getpagesize();
+    uint64_t num_pages_required = 1024;
+    uint64_t mmap_data_size = num_pages_required * page_sz;
+    uint64_t aux_size = 2800000000 * config->period / config->spe_period * 16;
+    aux_size = (uint64_t)pow(2, ceil(log2((double)aux_size)));
+
+    // add bounds
+    if (aux_size < 15) aux_size = 1 << 15;
+    else if (aux_size > 1 << 30) aux_size = 1 << 30;
+
+    uint64_t aux_off = mmap_data_size + page_sz;
     struct perf_event_mmap_page *meta_page = NULL;
     if ((meta_page = (struct perf_event_mmap_page *)mmap(NULL,
-                                                         (1 + NUM_PAGES) * PAGE_SIZE,
+                                                         mmap_data_size + page_sz,
                                                          PROT_READ | PROT_WRITE,
                                                          MAP_SHARED,
                                                          pmu->fd, 0)) == MAP_FAILED)
@@ -107,10 +132,10 @@ void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu)
         exit(EXIT_FAILURE);
     }
 
-    meta_page->aux_offset = AUX_OFFSET;
-    meta_page->aux_size = AUX_SIZE;
+    meta_page->aux_offset = aux_off;
+    meta_page->aux_size = aux_size;
 
-    void *aux_buffer = mmap(NULL, AUX_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, pmu->fd, AUX_OFFSET);
+    void *aux_buffer = mmap(NULL, aux_size, PROT_READ | PROT_WRITE, MAP_SHARED, pmu->fd, aux_off);
     if (aux_buffer == MAP_FAILED)
     {
         fprintf(stderr, "mmap failed: %m\n");
@@ -165,7 +190,7 @@ void configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config)
     {
         configure_ARM_SPE_cpu(i, &pmus[i], config);
         configure_software_PMU(&pmus[i], config);
-        mmap_ARM_SPE_cpu(&pmus[i]);
+        mmap_ARM_SPE_cpu(&pmus[i], config);
         ret = fcntl(pmus[i].fd, F_SETFL, O_RDONLY | O_NONBLOCK);
         if (ret == -1) exit(EXIT_FAILURE);
         ret = ioctl(pmus[i].software_fd, PERF_EVENT_IOC_SET_OUTPUT, pmus[i].fd);
