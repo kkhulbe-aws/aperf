@@ -50,6 +50,9 @@ sudo apt-get install \
     libbz2-dev       # For BZ2 compression
     libzstd-dev      # For Zstandard compression
 ```
+All of these are statically built into it, so the dependencies should be the exact same as without
+Hotline on the target machine.
+
 3. Run the following commands:
 
 ```

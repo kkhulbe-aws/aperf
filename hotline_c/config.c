@@ -26,7 +26,6 @@ void parse_arguments(int argc, char *argv[], struct arg_config *config) {
   config->period = DEFAULT_PERIOD;
   config->spe_period = DEFAULT_SPE_PERIOD;
   config->num_cpu = sysconf(_SC_NPROCESSORS_ONLN);
-  ;
   config->load_filter = DEFAULT_LOAD_FILTER;
   config->timeout = DEFAULT_TIMEOUT;
   config->throttle = 0; // no throttling by default
