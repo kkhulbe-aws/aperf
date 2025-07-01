@@ -61,6 +61,7 @@ fn main() -> Result<()> {
         .includes(["hotline_c"])
         .static_flag(true)
         .flag("-w")
+        .opt_level(2)
         .compile("hotline");
 
     println!("cargo:rustc-link-lib=static=dw");

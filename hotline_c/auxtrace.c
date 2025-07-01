@@ -137,7 +137,7 @@ int process_record_aux(struct arm_spe_pmu *pmu, struct cpu_session *session, uin
     uint64_t *key;
 
     uint64_t processed = 0;
-    uint64_t throttle_entries = (THROTTLE_LIMIT / num_cpu) * spe_period / 1000; // e.g., if we are sampling every half a second, we throttle at 
+    uint64_t throttle_entries = (AUX_THROTTLE_LIMIT / num_cpu) * spe_period / 1000; // e.g., if we are sampling every half a second, we throttle at 
                                                     // half the amount so the average consumption remains under the THROTTLE_LIMIT
 
     while (aux_tail + sizeof(struct spe_record) < aux_head)
@@ -156,6 +156,7 @@ int process_record_aux(struct arm_spe_pmu *pmu, struct cpu_session *session, uin
                              ((uint64_t)ts[7] << 56);
 
         struct aux_entry entry;
+        memset(&entry, 0, sizeof(entry));
 
         parse_record(record, &entry);
 
@@ -199,10 +200,10 @@ void parse_record(struct spe_record *record, struct aux_entry *entry)
     entry->issue_lat = issue_lat;
     entry->total_lat = total_lat;
 
-    if (issue_lat == AUX_SATURATED_WATERMARK)
+    if (issue_lat == AUX_SATURATED_WATERMARK && total_lat == AUX_SATURATED_WATERMARK)
     {
         entry->saturated = 1;
-    }
+    } else entry->saturated = 0;
 
     uint32_t events_packet = ((uint32_t)record->events_packet[0]) |
                              ((uint32_t)record->events_packet[1] << 8) |
@@ -524,33 +525,18 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry)
         const struct vm_spe_btree_entry *btree_entry = btree_get(vm_spe_tr, &key);
         struct completion_hist l1, l2, l3, dram;
 
-        if (btree_entry == NULL)
-        {
-            memset(&l1, 0, sizeof(struct completion_hist));
-            memset(&l2, 0, sizeof(struct completion_hist));
-            memset(&l3, 0, sizeof(struct completion_hist));
-            memset(&dram, 0, sizeof(struct completion_hist));
-        }
-        else
-        {
-            l1 = btree_entry->load_entry.l1;
-            l2 = btree_entry->load_entry.l2;
-            l3 = btree_entry->load_entry.l3;
-            dram = btree_entry->load_entry.dram;
-        }
-
         struct vm_spe_btree_entry new_entry;
         memset(&new_entry, 0, sizeof(struct vm_spe_btree_entry));
 
         new_entry.type = entry->type;
         new_entry.file_id = file_id;
         new_entry.offset = file_off;
-        if (entry->saturated)
+        if (entry->saturated == 1)
         {
             memcpy(&new_entry, &btree_entry, sizeof(struct vm_spe_btree_entry));
             new_entry.saturated_packets = btree_entry ? btree_entry->saturated_packets + 1 : 1;
             btree_set(vm_spe_tr, &new_entry);
-            return true;
+            return false;
         }
 
         new_entry.retired_insts = btree_entry ? btree_entry->retired_insts + 1 : 1;
@@ -612,16 +598,20 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry)
             new_entry.load_entry.l2 = l2;
             new_entry.load_entry.l3 = l3;
             new_entry.load_entry.dram = dram;
+            // new_entry.saturated_packets = btree_entry ? btree_entry->saturated_packets : 0; 
+            btree_set(vm_spe_tr, &new_entry);
+            return true;
         }
         else if (entry->type == AUX_RECORD_BRANCH)
         {
             new_entry.branch_entry.not_taken_branches = btree_entry ? btree_entry->branch_entry.not_taken_branches + entry->branch.not_taken : entry->branch.not_taken;
             new_entry.branch_entry.mispredicted = btree_entry ? btree_entry->branch_entry.mispredicted + entry->branch.mispredicted : entry->branch.mispredicted;
             new_entry.branch_entry.branch_type = entry->branch.branch_type;
+            // new_entry.saturated_packets = btree_entry ? btree_entry->saturated_packets : 0; 
+            btree_set(vm_spe_tr, &new_entry);
+            return true;
         }
-        btree_set(vm_spe_tr, &new_entry);
-        return true;
+        return false;
     }
-
     return false;
 }

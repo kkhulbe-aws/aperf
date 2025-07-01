@@ -5,7 +5,6 @@ pub mod data;
 pub mod pmu;
 pub mod record;
 pub mod report;
-pub mod spe;
 pub mod utils;
 pub mod visualizer;
 use anyhow::Result;
@@ -565,6 +564,9 @@ pub struct InitParams {
     pub tmp_dir: PathBuf,
     pub runlog: PathBuf,
     pub perf_frequency: u32,
+    pub num_cpu: u32,
+    pub spe_period: u32,
+    pub spe_wakeup_period: u32,
 }
 
 impl InitParams {
@@ -605,6 +607,9 @@ impl InitParams {
             tmp_dir: PathBuf::from(APERF_TMP),
             runlog: PathBuf::new(),
             perf_frequency: 99,
+            num_cpu: 64,
+            spe_period: 2800000,
+            spe_wakeup_period: 1000
         }
     }
 }

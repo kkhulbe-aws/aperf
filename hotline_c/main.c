@@ -5,6 +5,10 @@
 #include "btree.h"
 #include "mmap_table.h"
 #include <stdatomic.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 // global data structures independent of sessions
 struct btree *vm_spe_tr;
@@ -22,23 +26,21 @@ extern int build_report();
 #define PATH_MAX 512
 #endif
 
+
 /**
  * On every event loop:
- * 1. Iterate through record buffer
- * 2. If the event is PERF_RECORD_MMAP2, add event to min heap
- * 3. If the event is PERF_RECORD_AUX
- *      a. Add entries to min heap and convert time stamp
- * 4. If the event is PERF_RECORD_CONTEXT_SWITCH_CPU_WIDE
- *      b. Add entry to min heap
- * 5. Drain the min heap
- *      a. If the heap entry is a hotline entry --> update aggregate statistics for pids
- *      b. If the heap entry is an MMAP entry (add or delete) --> update MMAPings
- *      c. If the heap entry is a SWITCH --> udpate the current session
+ * 1. Loop through the AUX buffer, starting from where we left off on the previous loop
+ * 2. Upgrade the timestamp of the session by iterating through the record buffer up
+ *    to the timestamp right before the current AUX entry
+ *    a. If it is PERF_RECORD_SWITCH_CPU_WIDE: if it is a switch out, update the current session pid
+ *    b. If it is PERF_RECORD_MMAP2: update the mmap datastructures with the new mappings
+ *    c. If it is PERF_RECORD_EXIT: clean out the mmap mappings for the corresponding pid
+ * 
+ * The tool is implemented with this two pointer mechanism rather than a min-heap because we observed
+ * the CPU utilization overhead of the minheap is non-trivial, and can reach upwards of 9-11%, on worst-case
+ * workloads. This mechanism has an observed worst-case of 2% and average of 1%, which motivates enabling it by 
+ * default on APerf.
  *
- * The min heap is required because the context switch events and aux events are not sequential
- * therefore, we may have an aux event at a timestamp later than a context switch show up earlier.
- * Perf approaches these events the same way
-
  * Architecture:
  *
  * +---------------+---------------+
@@ -50,8 +52,8 @@ extern int build_report();
  *                 |
  * +---------+    +----------+    +-----------+
  * | Session |    |          |    | hotline   |
- * | current |----> Ordered  <----+ B-Tree    |
- * |  PID    |    | Samples  |    |           |
+ * | current |----> Main loop<----+ B-Tree    |
+ * |  PID    |    |          |    |           |
  * +---------+    +----------+    +-----------+
  *                     ^                |
  *                     |                |
@@ -66,10 +68,8 @@ extern int build_report();
  * the current pid is (hence the PERF_RECORD_SWITCH_CPU_WIDE records), and a mapping structure for the virtual address
  * offsets. To ensure proper time ordering, everything is inserted into the heap, pulled out, and processed in the corresponding
  * data structures.
- *
- * On some workloads (particularly those that just hammer the memory modules), CPU usage increases due to context switching and large amounts
- * of events being generated. In the worst case, it increases to 10-11%. To mitigate this, the --throttle flag allows the tool to throttle records.
- * The tool throttles the record buffer at 64000 records / second. This is divided by the number of CPUs to ensure that this throttle amount is met.
+ * 
+ * The tool maintains a legacy implementation using the min-heap, and can be swapped out for the two pointer method.
  */
 
 const char *get_hotline_dir()
@@ -77,6 +77,13 @@ const char *get_hotline_dir()
     const char *env_dir = getenv("HOTLINE_DIR");
     return env_dir ? env_dir : HOTLINE_DIR;
 }
+
+const char *get_hotline_report_dir()
+{
+    const char *env_dir = getenv("HOTLINE_REPORT_DIR");
+    return env_dir ? env_dir : HOTLINE_DIR;
+}
+
 
 int get_hotline_verbose()
 {
@@ -98,17 +105,22 @@ void print_progress_bar(int percentage)
         }
     }
     printf("] %d%%", percentage);
-    fflush(stdout); // Important to flush the output
+    fflush(stdout);
+}
+
+void signal_handler(int signum) {
+    commit_to_file();
+    exit(signum);
 }
 
 void commit_to_file()
 {
     char path[PATH_MAX];
-    snprintf(path, sizeof(path), "%s/%s", get_hotline_dir(), "hotlines_loads.data");
+    snprintf(path, sizeof(path), "%s/%s", get_hotline_dir(), "spe_hotline_loads.bin");
     FILE *load_fp = fopen(path, "w");
 
     memset(path, 0, sizeof(char) * PATH_MAX);
-    snprintf(path, sizeof(path), "%s/%s", get_hotline_dir(), "hotlines_branches.data");
+    snprintf(path, sizeof(path), "%s/%s", get_hotline_dir(), "spe_hotline_branches.bin");
     FILE *branch_fp = fopen(path, "w");
 
     if (!load_fp || !branch_fp)
@@ -186,21 +198,21 @@ int hotline_main(int argc, char *argv[])
     struct arm_spe_pmu pmus[config.num_cpu];
 
     struct cpu_session sessions[config.num_cpu];
-    printf("Configuration:\n");
-    printf("\tPeriod: %d ms\n", config.period);
-    printf("\tSPE Period: %d cycles\n", config.spe_period);
-    printf("\tNumber of CPUs: %d\n", config.num_cpu);
-    printf("\tLoad Filter: %d cycles\n", config.load_filter);
-    printf("\tTimeout: %d s\n", config.timeout);
-    printf("\tShould Throttle: %d s\n", config.throttle);
-    printf("\tDirectory: %s\n", get_hotline_dir());
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = signal_handler;
+    sigemptyset(&sa.sa_mask);
+    sa.sa_flags = 0;
+
+    if (sigaction(SIGTERM, &sa, NULL) == -1) {
+        perror("Error: cannot handle SIGTERM");
+        return 1;
+    }
 
     configure_all_pmus(pmus, &config);
-    // printf("PMUs configured.\n");
-
     reset_all_pmus(pmus, &config);
-    // printf("PMUs reset.\n");
-
+    enable_all_pmus(pmus, &config);
     struct spe_stats stats;
     memset(&stats, 0, sizeof(struct spe_stats));
 
@@ -209,17 +221,9 @@ int hotline_main(int argc, char *argv[])
         configure_cpu_session(&sessions[i], &pmus[i]);
     }
 
-    // printf("CPU sessions have been set up.\n");
-
     // set up btree
     vm_spe_tr = btree_new(sizeof(struct vm_spe_btree_entry), 0, vm_spe_btree_compare, NULL);
     btree_clear(vm_spe_tr);
-
-    // printf("B-Tree setup.\n");
-
-    enable_all_pmus(pmus, &config);
-
-    // printf("Profiling has begun.\n");
 
     // initialize mapping table and read /proc/map to get all currently running processes
     // this is needed as currently running processes do not generate MMAP2 records
@@ -230,49 +234,16 @@ int hotline_main(int argc, char *argv[])
     // main event loop
     for (int itr = 0; itr < iters; itr++)
     {
-        // Ensure sleep is completed before proceeding
-        atomic_thread_fence(memory_order_seq_cst);
         usleep(1000 * config.period);
-        atomic_thread_fence(memory_order_seq_cst);
-
-        volatile uint64_t heap_entries = 0;
-
-        // fence before PMU operations
-        __sync_synchronize();
 
         for (int i = 0; i < config.num_cpu; i++)
         {
-            __asm__ __volatile__("" ::: "memory");
-            // traverse_buffers(&pmus[i], &sessions[i]);
-            process_record_buffer(&pmus[i], &stats, &sessions[i], config.num_cpu, config.period, config.throttle);
-            process_record_aux(&pmus[i], &sessions[i], config.num_cpu, config.period, config.throttle);
-            heap_entries += drain_heap(&sessions[i]);
-
-            // force completion of PMU operations
-            __sync_synchronize();
-            atomic_thread_fence(memory_order_seq_cst);
-
-            // ARM-specific memory barrier
-            __asm__ __volatile__("dmb ish" ::: "memory");
+            traverse_buffers(&pmus[i], &sessions[i]);
         }
-
-        __sync_synchronize();
-        atomic_thread_fence(memory_order_seq_cst);
     }
 
-    // ensure all operations complete before disabling PMUs
-    __sync_synchronize();
-    atomic_thread_fence(memory_order_seq_cst);
-    print_progress_bar(100);
     disable_all_pmus(pmus, &config);
 
-
-    // printf("Disabled.\n");
-
-    printf("\nProfiling complete. Dumping data.\n");
     commit_to_file();
-    printf("\nData generated. Building report. \n\n");
-    build_report();
-    printf("\nEverything written to {hotlines_branches.report} and {hotlines_loads.report}. Have a great day :)\n\n");
     exit(EXIT_SUCCESS);
 }

@@ -37,15 +37,9 @@ Download the binary from the [Releases](https://github.com/aws/APerf/releases) p
 
 ### Building from source
 1. Download the source code from the [Releases](https://github.com/aws/APerf/releases) page.
-2. Run the following commands:
-
-```
-cargo build
-cargo test
-```
-
-3. To build APerf with in-memory SPE support, you'll need the following development packages installed. On Debian/Ubuntu systems, you can install them using:
-
+2. The ARM SPE in-memory profiling tool, hotline, is enabled by default and requires having
+    a. Kernel drivers for SPE enabled and with appropriate permissions
+    b. The following development packages *on your build machine*. On Debian/Ubuntu systems, you can use 
 ```bash
 sudo apt-get install \
     libdw-dev        # For elfutils/libdw support
@@ -56,13 +50,17 @@ sudo apt-get install \
     libbz2-dev       # For BZ2 compression
     libzstd-dev      # For Zstandard compression
 ```
-
-4. You will also need to have SPE drivers installed on the machine under test.
-
-5. Run the following commands
+3. Run the following commands:
 
 ```
-cargo build --features spe
+cargo build
+cargo test
+```
+
+4. To build without hotline, use
+
+```
+cargo build --no-default-features
 cargo test
 ```
 
@@ -141,6 +139,12 @@ To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 
 `--profile-java` profile JVMs by PID or name using async-profiler (default profiles all JVMs)
 
+`--num-cpu` number of CPUs to profile from. ID will be from `0` to `n-1` **[hotline tool]**
+
+`--spe-wakeup-period` wake up period (ms) **[hotline tool]**
+
+`--spe-period` ARM SPE sampling period (cycles) **[hotline tool]**
+
 `./aperf record -h`
 
 **Reporter Flags:**
@@ -166,28 +170,6 @@ To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 `--verify` Verify the supplied PMU file
 
 `./aperf custom-pmu -h`
-
-**ARM-SPE Flags:**
-
-`-r, --run-name` run name (name of the run for organization purposes, creates directory of the same name, default of aperf_[timestamp])
-
-`-n, --num-cpu` number of CPUs to profile from. ID will be from `0` to `n-1`
-
-`-p, --period` wake up period (ms)
-
-`-s, --spe-period` ARM SPE sampling period (cycles)
-
-`-v, --verbose` verbose messages
-
-`-x, --timeout` how long to run the profile
-
-`-t, --tmp-dir` temporary directory for the intemediate files (CURRENTLY UNUSED)
-
-`-y, --throttle` toggle throttling data for lowering CPU utilization
-
-`-h, --help` print help
-
-`-V, --version` print version
 
 ## APerf Issues?
 Below are some prerequisites for profiling with APerf:

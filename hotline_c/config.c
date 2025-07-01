@@ -147,7 +147,7 @@ extern long configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *c
     fd = perf_event_open(&attr, -1, pmu->cpu, -1, PERF_FLAG_FD_CLOEXEC);
     if (fd == -1)
     {
-        fprintf(stderr, "error opening leader event\n");
+        fprintf(stderr, "Error opening SPE perf event. Are you on Grv with kernel drivers loaded?\n");
         exit(EXIT_FAILURE);
     }
     pmu->software_fd = fd;
@@ -238,4 +238,6 @@ void configure_cpu_session(struct cpu_session *session, struct arm_spe_pmu *pmu)
     heap_create(&session->ordered_samples, 0, compare_uint64_keys);
 
     session->pid = 0; // maybe switch to calling process?
+    session->last_aux_ts = 0;
+    session->last_aux_tail = 0;
 }

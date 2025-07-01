@@ -31,9 +31,25 @@ pub struct Record {
     #[clap(long, value_parser, default_missing_value = Some("jps"), value_names = &["PID/Name>,<PID/Name>,...,<PID/Name"], num_args = 0..=1)]
     pub profile_java: Option<String>,
 
+    /// Profile using SPE and hotline.
+    #[clap(long, value_parser, default_value_t = true)]
+    pub profile_spe: bool,
+
     /// Custom PMU config file to use.
     #[clap(long, value_parser)]
     pub pmu_config: Option<String>,
+
+    /// Number of CPUs to profile, from id 0 to N-1
+    #[clap(long, value_parser, default_value_t = 64)]
+    pub num_cpu: u32,
+
+    /// SPE sampling frequency, defaulted to 1kHz on Grv4.
+    #[clap(long, value_parser, default_value_t = 2800000)]
+    pub spe_period: u32,
+
+    /// Wakeup period to aggregate SPE buffers, provided in ms.
+    #[clap(long, value_parser, default_value_t = 1000)]
+    pub spe_wakeup_period: u32,
 }
 
 fn prepare_data_collectors() -> Result<()> {
@@ -86,6 +102,10 @@ pub fn record(record: &Record, tmp_dir: &Path, runlog: &Path) -> Result<()> {
         params.pmu_config = Some(PathBuf::from(p));
     }
 
+    params.num_cpu = record.num_cpu;
+    params.spe_period = record.spe_period;
+    params.spe_wakeup_period = record.spe_wakeup_period;
+
     match &record.profile_java {
         Some(j) => {
             params.profile.insert(
@@ -105,6 +125,9 @@ pub fn record(record: &Record, tmp_dir: &Path, runlog: &Path) -> Result<()> {
             String::new(),
         );
         params.perf_frequency = record.perf_frequency;
+    }
+    if record.profile_spe {
+
     }
 
     PERFORMANCE_DATA.lock().unwrap().set_params(params);

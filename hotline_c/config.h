@@ -28,11 +28,18 @@
 #define PERF_ARM_SPE_RAW_CONFIG 0x10001 // enable load collection, branch collection, and load filtering
 #define PERF_FORMAT_SPE 0x10
 
+// #define AUX_WATERMARK 64 // watermark notification for PERF_SAMPLE_AUX record generation
+// #define NUM_PAGES 64 * 2 // MUST be a power of two
+// #define PAGE_SIZE 4096
+// #define AUX_SIZE 131072 * 16
+// #define AUX_OFFSET 0x41000 * 16
+
 #define AUX_WATERMARK 64 // watermark notification for PERF_SAMPLE_AUX record generation
-#define NUM_PAGES 64 * 2 // MUST be a power of two
 #define PAGE_SIZE 4096
-#define AUX_SIZE 131072 * 16
-#define AUX_OFFSET 0x41000 * 16
+#define NUM_PAGES 1024 // Increased from 128 to 1024
+#define DATA_SIZE (NUM_PAGES * PAGE_SIZE)
+#define AUX_SIZE (1024 * 1024 * 64) // 64 MB, increased from about 2 MB
+#define AUX_OFFSET (DATA_SIZE + PAGE_SIZE) // Ensure it's after data section and page-aligned
 
 struct arg_config
 {

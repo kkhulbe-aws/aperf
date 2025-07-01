@@ -44,10 +44,11 @@
 #define L2_BOUND_BIN 15
 #define L3_BOUND_BIN 50
 
-#define THROTTLE_LIMIT 16000 // entries / second
+#define THROTTLE_LIMIT 64000 // entries / second
                              // if set, we will only process 50k ordered entries. rest will be dropped
                              // given enough sampling time, the throttled method and unthrottled will converge
                              // this throttle allows THROTTLE_LIMIT record entries, and THROTTLE_LIMIT aux entries
+#define AUX_THROTTLE_LIMIT 24000 // entries / second
 
 struct spe_stats
 {
@@ -160,7 +161,7 @@ struct aux_entry
     uint64_t pc;
     uint16_t total_lat;
     uint16_t issue_lat;
-    uint32_t saturated;
+    uint8_t saturated;
     uint32_t retired;
     union
     {

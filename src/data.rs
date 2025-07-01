@@ -10,6 +10,7 @@ pub mod kernel_config;
 pub mod meminfodata;
 pub mod netstat;
 pub mod perf_profile;
+pub mod spe_profile;
 pub mod perf_stat;
 pub mod processes;
 pub mod sysctldata;
@@ -35,6 +36,7 @@ use meminfodata::{MeminfoData, MeminfoDataRaw};
 use netstat::{Netstat, NetstatRaw};
 use nix::sys::{signal, signal::Signal};
 use perf_profile::{PerfProfile, PerfProfileRaw};
+use spe_profile::{SPEProfileRaw, SPEProfile};
 use perf_stat::{PerfStat, PerfStatRaw};
 use processes::{Processes, ProcessesRaw};
 use serde::{Deserialize, Serialize};
@@ -59,6 +61,9 @@ pub struct CollectorParams {
     pub runlog: PathBuf,
     pub pmu_config: Option<PathBuf>,
     pub perf_frequency: u32,
+    pub spe_period: u32,
+    pub spe_wakeup_period: u32,
+    pub num_cpu: u32,
 }
 
 impl CollectorParams {
@@ -75,6 +80,9 @@ impl CollectorParams {
             runlog: PathBuf::new(),
             pmu_config: Option::None,
             perf_frequency: 99,
+            num_cpu: 64,
+            spe_period: 2800000,
+            spe_wakeup_period: 1000,
         }
     }
 }
@@ -135,6 +143,10 @@ impl DataType {
         self.collector_params.tmp_dir = param.tmp_dir.clone();
         self.collector_params.runlog = param.runlog.clone();
         self.collector_params.pmu_config = param.pmu_config.clone();
+
+        self.collector_params.num_cpu = param.num_cpu.clone();
+        self.collector_params.spe_period = param.spe_period.clone();
+        self.collector_params.spe_wakeup_period = param.spe_wakeup_period.clone();
 
         self.file_handle = Some(
             OpenOptions::new()
@@ -311,7 +323,8 @@ data!(
     NetstatRaw,
     PerfProfileRaw,
     FlamegraphRaw,
-    JavaProfileRaw
+    JavaProfileRaw,
+    SPEProfileRaw
 );
 
 processed_data!(
@@ -327,6 +340,7 @@ processed_data!(
     MeminfoData,
     Netstat,
     PerfProfile,
+    SPEProfile,
     Flamegraph,
     AperfStat,
     AperfRunlog,
