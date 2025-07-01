@@ -75,14 +75,38 @@ struct cpu_session
     uint64_t last_aux_ts, last_record_ts;
 };
 
-extern void setup_default_variables();
+/// @brief configures the hardware PMU event for SPE
+/// @param cpu cpu number to open
+/// @param pmu PMU metadata struct
+/// @param config user supplied configuration
 extern void configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu, struct arg_config *config);
+
+/// @brief MMAPs data for the data and aux buffer for the provided PMU
+/// @param pmu PMU metadata struct to mmap data for
+/// @param config user supplied configuration
 extern void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config);
+
+/// @brief configures the software PMU event for SPE, in order to get context switch records
+///        pipes the records into the hardware event for the cpu configured by`configure_ARM_SPE_cpu`
+/// @param pmu PMU metadata struct
+/// @param config user supplied configuration 
 extern void configure_software_PMU(struct arm_spe_pmu *pmu, struct arg_config *config);
+
+/// @brief Loops through all CPUs and sets them up
+/// @param pmus PMU array
+/// @param config user supplied configuration
 extern void configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
+
+/// @brief functions to enable, disable, and reset all PMUs
+/// @param pmus PMU array
+/// @param config user supplied configuration
 extern void enable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
 extern void disable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
 extern void reset_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config);
+
+/// @brief Default sets up a CPU session (active, potentially time-dependent, CPU information)
+/// @param session CPU session to configure
+/// @param pmu PMU metadata struct
 extern void configure_cpu_session(struct cpu_session *session, struct arm_spe_pmu *pmu);
 
 #endif // CONFIG_H_

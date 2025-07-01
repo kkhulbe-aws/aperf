@@ -30,12 +30,3 @@ bool vm_spe_btree_iter(const void *node, const void *data)
 
     return true;
 }
-
-bool insert_into_btree(struct cpu_session *session, struct ordered_sample *sample)
-{
-    if (sample->type != PERF_RECORD_AUX)
-        return false;
-
-    // @todo need mapping structures for this
-    // 1. use the
-}

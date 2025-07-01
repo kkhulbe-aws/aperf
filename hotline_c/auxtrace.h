@@ -48,6 +48,7 @@
 #define GRV3 0xd40
 #define GRV4 0xd4f
 
+/// @brief overall statistics counters, for debugging the tool
 struct spe_stats
 {
     uint64_t aux_events, mmap2_events, itrace_events, switch_cpu_wide_events, exit_events, other;
@@ -55,6 +56,7 @@ struct spe_stats
     uint64_t saturated_entries;
 };
 
+/// @brief sample_id struct spec from https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 struct sample_id
 {
     uint32_t pid, tid;
@@ -63,6 +65,7 @@ struct sample_id
     uint64_t id;
 };
 
+/// @brief aux record spec from https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 struct __attribute__((packed)) aux_record
 {
     struct perf_event_header header;
@@ -72,6 +75,7 @@ struct __attribute__((packed)) aux_record
     struct sample_id sid;
 };
 
+/// @brief spe_record spec from observing perf reports and ARM docs
 struct __attribute__((packed)) spe_record
 {
     uint8_t __reserved1;
@@ -97,6 +101,7 @@ struct __attribute__((packed)) spe_record
     uint8_t timestamp[8];
 };
 
+/// @brief itrace_record spec from https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 struct __attribute__((packed)) itrace_record
 {
     struct perf_event_header header;
@@ -104,6 +109,7 @@ struct __attribute__((packed)) itrace_record
     uint32_t tid;
 };
 
+/// @brief mmap2 record spec from https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 struct __attribute__((packed)) mmap2_record
 {
     struct perf_event_header header;
@@ -136,6 +142,7 @@ struct __attribute__((packed)) mmap2_record
     char filename[];
 };
 
+/// @brief switch_cpu_wide spec from https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 struct __attribute__((packed)) switch_cpu_wide
 {
     struct perf_event_header header;
@@ -144,6 +151,7 @@ struct __attribute__((packed)) switch_cpu_wide
     struct sample_id sid;
 };
 
+/// @brief process_exit spec from https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 struct __attribute__((packed)) process_exit
 {
     struct perf_event_header header;
@@ -177,6 +185,7 @@ struct aux_entry
     };
 };
 
+/// @brief clean representation of all different kinds of records
 struct ordered_sample
 {
     uint16_t type;
@@ -221,16 +230,39 @@ struct ordered_sample
     } sample;
 };
 
-extern int process_record_mmap2(struct mmap2_record *record);
-
-// helpers
+/// @brief reads /proc/cpuinfo to determine if we are using GRV3 or GRV4, and 
+/// uses exists lat_mem_rd tests to assign cache bins
 extern void setup_completion_bins();
+
+/// @brief Takes a raw SPE packet entry and parses into a more manageable format
+/// @param record raw data passed in
+/// @param entry aux entry to populate
 extern void parse_record(struct spe_record *record, struct aux_entry *entry);
+
+/// @brief Conversion function from SPE time scale to Perf time scale
+/// @param cyc cycles in SPE time scale
+/// @param tc conversion struct (populated during PMU setup)
+/// @return perf time
 extern uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc);
-extern int is_valid(enum perf_event_type type, void *record);
+
+/// @brief Utility function to update the B-Tree based on the aux entry provided. Updates the
+///        branch or load entries for a given PC based on the aux_entry flags.
+/// @param session current CPU session
+/// @param entry aux entry to update with
+/// @return true if the record was successfully put into the B-Tree, false otherwise
 extern bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry);
 
+/// @brief The bulk of the CPU time goes into this. Loops through the aux buffer from the last read
+///        tail to the current head. Every aux entry it will upgrade the timestamp, i.e. process the
+//         record buffer up to the last entry before this time stamp.
+/// @param pmu PMU with the buffer pointers
+/// @param session current CPU session
 extern void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session);
+
+/// @brief Iterates through the record buffer, handling MMAP2, EXIT, and SWITCH_CPU_WIDE records as they come
+/// @param pmu PMU with the buffer pointers
+/// @param session current CPU session
+/// @param ts timestamp to upgrade to
 extern void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session, uint64_t ts);
 
 extern struct btree *vm_spe_tr;

@@ -36,7 +36,17 @@ struct vm_spe_btree_entry
     };
 };
 
+/// @brief Compare function to make B-Tree operations possible
+/// @param a first node to compare
+/// @param b second node to compare
+/// @param data auxiliary data (unused)
+/// @return -1 if a < b, 1 if a > b, 0 if a == b
 extern int vm_spe_btree_compare(const void *a, const void *b, void *data);
+
+/// @brief Iterator for the B-Tree. Used when committing to files. Always returns true for
+//         end-to-end iteration.
+/// @param node (unused)
+/// @param data (unused)
+/// @return true
 extern bool vm_spe_btree_iter(const void *node, const void *data);
-extern bool insert_into_btree(struct cpu_session *session, struct ordered_sample *sample);
 #endif // VM_SPE_BTREE_H_;

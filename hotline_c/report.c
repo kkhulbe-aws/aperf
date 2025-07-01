@@ -598,7 +598,7 @@ void generate_exec_latency_view(CompletionEntry *completions, int completion_cou
     FILE *fp = fopen(filepath, "w");
     if (!fp)
     {
-        printf("Error creating exec_latency_view.csv: %s\n", strerror(errno));
+        fprintf("Error creating exec_latency_view.csv: %s\n", strerror(errno));
         exit(EXIT_FAILURE);
         return;
     }
@@ -916,7 +916,6 @@ int build_report()
 
     // Generate views
     generate_exec_latency_view(completion_entries, completion_count);
-    printf("generated exec lat view\n");
     generate_issue_latency_view(completion_entries, completion_count);
     generate_x_latency_view(completion_entries, completion_count);
     generate_branch_view(branch_entries, branch_count);
