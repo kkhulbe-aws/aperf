@@ -1,76 +1,66 @@
 #ifndef MMAP_TABLE_H
 #define MMAP_TABLE_H
 
+#include <ctype.h>
+#include <dirent.h>
 #include <err.h>
-#include <string.h>
+#include <linux/perf_event.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <stdint.h>
-#include <linux/perf_event.h>
-#include <dirent.h>
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
 
 #define PID_MAP_HASH_SIZE 1024
 
 #define MAX_FILENAMES 2000
 
-struct map_entry
-{
-    uint64_t start; // virtual address start
-    uint64_t end;   // virtual address end
-    uint64_t pgoff; // file offset
-    uint32_t filename_index;
+struct map_entry {
+  uint64_t start; // virtual address start
+  uint64_t end;   // virtual address end
+  uint64_t pgoff; // file offset
+  uint32_t filename_index;
 };
 
-struct pid_maps
-{
-    struct map_entry *maps;
-    size_t count;
-    size_t capacity;
-    pid_t pid;
-    struct pid_maps *next; // for hash collision handling
+struct pid_maps {
+  struct map_entry *maps;
+  size_t count;
+  size_t capacity;
+  pid_t pid;
+  struct pid_maps *next; // for hash collision handling
 };
 
-struct pid_maps_table
-{
-    struct pid_maps *buckets[PID_MAP_HASH_SIZE];
+struct pid_maps_table {
+  struct pid_maps *buckets[PID_MAP_HASH_SIZE];
 };
 
-struct __attribute__((packed)) mmap2_mapping
-{
-    struct perf_event_header header;
-    uint32_t pid;
-    uint32_t tid;
-    uint64_t addr;
-    uint64_t len;
-    uint64_t pgoff;
-    union
-    {
-        struct
-        {
-            uint32_t maj;
-            uint32_t min;
-            uint64_t ino;
-            uint64_t ino_generation;
-        };
-
-        struct
-        {
-            uint8_t bbuild_id_size;
-            uint8_t __reserved_1;
-            uint16_t __reserved_2;
-            uint8_t build_id[20];
-        };
+struct __attribute__((packed)) mmap2_mapping {
+  struct perf_event_header header;
+  uint32_t pid;
+  uint32_t tid;
+  uint64_t addr;
+  uint64_t len;
+  uint64_t pgoff;
+  union {
+    struct {
+      uint32_t maj;
+      uint32_t min;
+      uint64_t ino;
+      uint64_t ino_generation;
     };
 
-    uint32_t prot;
-    uint32_t flags;
-    uint64_t file_id;
+    struct {
+      uint8_t bbuild_id_size;
+      uint8_t __reserved_1;
+      uint16_t __reserved_2;
+      uint8_t build_id[20];
+    };
+  };
+
+  uint32_t prot;
+  uint32_t flags;
+  uint64_t file_id;
 };
 
 /// @brief Sets up, frees, and accesses pid tables
@@ -82,7 +72,8 @@ extern struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid);
 /// @param table global PID table to add into
 /// @param pid PID to add into (hashed into an array)
 /// @param entry entry to update mapping
-extern void add_map_entry(struct pid_maps_table *table, pid_t pid, struct map_entry *entry);
+extern void add_map_entry(struct pid_maps_table *table, pid_t pid,
+                          struct map_entry *entry);
 
 /// @brief Removes all mappings for a given PID. Used for EXIT records.
 /// @param table global PID table to add into
@@ -94,14 +85,17 @@ extern struct pid_maps_table *init_pid_maps(void);
 
 /// @brief Logic to update the PID table given a new MMAP2 record
 /// @param table Table to update
-/// @param record MMAP2 record, read from the record buffer during `traverse_buffers`
-extern void handle_mmap2_record(struct pid_maps_table *table, const struct mmap2_mapping *record);
+/// @param record MMAP2 record, read from the record buffer during
+/// `traverse_buffers`
+extern void handle_mmap2_record(struct pid_maps_table *table,
+                                const struct mmap2_mapping *record);
 
 /// @brief Nice helper to visualize mapping table for debugging
 /// @param table table to visualize
 extern void print_mapping_table(struct pid_maps_table *table);
 
-/// @brief We are not given MMAP2 records for already running processes. We figure this out by 
+/// @brief We are not given MMAP2 records for already running processes. We
+/// figure this out by
 ///        reading /proc/... to get all active processes and map them in.
 /// @param table Table to map into
 extern void get_initial_mappings(struct pid_maps_table *table);
@@ -112,9 +106,11 @@ extern void get_initial_mappings(struct pid_maps_table *table);
 /// @param filename filename pointer to populate
 /// @param file_offset file offset pointer to populate
 /// @return 0 if no mapping found, 1 if successfully mapped
-extern int pc_to_file_offset(struct pid_maps *maps, uint64_t pc, char **filename, uint64_t *file_offset);
+extern int pc_to_file_offset(struct pid_maps *maps, uint64_t pc,
+                             char **filename, uint64_t *file_offset);
 
-/// @brief We maintain a global filestructure, since many processes can map to the same file. This
+/// @brief We maintain a global filestructure, since many processes can map to
+/// the same file. This
 ///        function allows adding into it
 /// @param filename filename to add into it
 /// @return returns index at which file was added
