@@ -2,19 +2,6 @@
 
 #include <math.h>
 
-uint64_t get_num_pages(uint64_t spe_period, uint64_t period_ms) {
-  uint64_t samples_per_wakeup = (period_ms * 1000) / spe_period;
-
-  uint64_t base_pages = (uint64_t)ceil(samples_per_wakeup / 4.0);
-
-  uint64_t num_pages = 32;
-  while (num_pages < base_pages && num_pages < 256) {
-    num_pages *= 2;
-  }
-
-  return num_pages;
-}
-
 long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu,
                      int group_fd, unsigned long flags) {
   int ret;
