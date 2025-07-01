@@ -1,6 +1,50 @@
 #include "auxtrace.h"
 #include "vm_spe_btree.h"
 
+uint64_t L1_BOUND_BIN = 0;
+uint64_t L2_BOUND_BIN = 0;
+uint64_t L3_BOUND_BIN = 0;
+
+uint64_t get_cpu_part_num() {
+    FILE *fp;
+    char line[256];
+    uint64_t part_num = 0;
+
+    fp = fopen("/proc/cpuinfo", "r");
+    if (fp == NULL) {
+        perror("Error opening /proc/cpuinfo");
+        return 0;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+        if (strncmp(line, "CPU part", 8) == 0) {
+            sscanf(line, "CPU part\t: 0x%lx", &part_num);
+            break;
+        }
+    }
+
+    fclose(fp);
+    return part_num;
+}
+
+void setup_completion_bins() {
+    switch (get_cpu_part_num()) {
+        case GRV3:
+            L1_BOUND_BIN = 5; // 1.8 ns
+            L2_BOUND_BIN = 16; // 5.7 ns
+            L3_BOUND_BIN = 95; // 34 ns
+            break;
+        case GRV4:
+            L1_BOUND_BIN = 4; // 1.5 ns
+            L2_BOUND_BIN = 14; // 5.0 ns
+            L3_BOUND_BIN = 87; // 31 ns
+            break;
+        default:
+            printf("Invalid CPU part number detected. \n");
+            exit(EXIT_FAILURE);
+    }
+}
+
 void parse_record(struct spe_record *record, struct aux_entry *entry)
 {
     // parsing logic to get what we want out of the record

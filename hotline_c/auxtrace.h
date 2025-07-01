@@ -39,15 +39,14 @@
 #define REMOTE 0b1101
 #define DRAM 0b1110
 
-#define L1_BOUND_BIN 5
-#define L2_BOUND_BIN 15
-#define L3_BOUND_BIN 50
-
 #define THROTTLE_LIMIT 64000 // entries / second
                              // if set, we will only process 50k ordered entries. rest will be dropped
                              // given enough sampling time, the throttled method and unthrottled will converge
                              // this throttle allows THROTTLE_LIMIT record entries, and THROTTLE_LIMIT aux entries
 #define AUX_THROTTLE_LIMIT 24000 // entries / second
+
+#define GRV3 0xd40
+#define GRV4 0xd4f
 
 struct spe_stats
 {
@@ -225,6 +224,7 @@ struct ordered_sample
 extern int process_record_mmap2(struct mmap2_record *record);
 
 // helpers
+extern void setup_completion_bins();
 extern void parse_record(struct spe_record *record, struct aux_entry *entry);
 extern uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc);
 extern int is_valid(enum perf_event_type type, void *record);
