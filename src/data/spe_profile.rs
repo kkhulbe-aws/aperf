@@ -8,7 +8,6 @@ use anyhow::Result;
 use csv_to_html;
 use ctor::ctor;
 use libc::{_exit, c_int, fork};
-use log::info;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::error::Error;
@@ -123,7 +122,10 @@ fn generate_html(title: &str, table_style: &str, table_content: &str) -> String 
     fn add_column_classes(html: &str) -> String {
         let mut lines: Vec<String> = html.lines().map(String::from).collect();
         if let Some(header) = lines.first_mut() {
-            *header = header.replace("<th>Assembly</th>", "<th class=\"assembly-column\">Assembly</th>");
+            *header = header.replace(
+                "<th>Assembly</th>",
+                "<th class=\"assembly-column\">Assembly</th>",
+            );
             *header = header.replace("<th>Source</th>", "<th class=\"source-column\">Source</th>");
         }
         for line in lines.iter_mut().skip(1) {
@@ -146,7 +148,6 @@ fn generate_html(title: &str, table_style: &str, table_content: &str) -> String 
         add_column_classes(table_content)
     )
 }
-
 
 fn write_html_file(
     params: &ReportParams,
@@ -273,16 +274,13 @@ impl GetData for SPEProfile {
 
         let _ = generate_html_tables(
             &params,
-            &format!("{}/data/completion_node_view.csv", params.report_dir.display()),
+            &format!(
+                "{}/data/completion_node_view.csv",
+                params.report_dir.display()
+            ),
             &format!("{}/data/exec_lat_view.csv", params.report_dir.display()),
-            &format!(
-                "{}/data/issue_lat_view.csv",
-                params.report_dir.display()
-            ),
-            &format!(
-                "{}/data/x_lat_view.csv",
-                params.report_dir.display()
-            ),
+            &format!("{}/data/issue_lat_view.csv", params.report_dir.display()),
+            &format!("{}/data/x_lat_view.csv", params.report_dir.display()),
             &format!("{}/data/branch_view.csv", params.report_dir.display()),
         );
 

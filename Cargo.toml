@@ -62,7 +62,6 @@ serial_test = "3.1.1"
 log4rs = "1.3.0"
 tdigest = "0.2"
 csv = "1.2"
-askama = "0.12"
 csv-to-html = "0.5.10"
 
 [features]
