@@ -7,10 +7,9 @@ void parse_record(struct spe_record *record, struct aux_entry *entry) {
   // we explicitly shift it to make it little endian and architecture
   // agnostic
   uint64_t pc;
-  pc = (uint64_t)record->pc[0] | ((uint64_t)record->pc[1] << 8) |
-       ((uint64_t)record->pc[2] << 16) | ((uint64_t)record->pc[3] << 24) |
-       ((uint64_t)record->pc[4] << 32) | ((uint64_t)record->pc[5] << 40) |
-       ((uint64_t)record->pc[6] << 48);
+  memcpy(&pc, &record->pc, 7);
+  pc = pc & 0x00FFFFFFFFFFFFFF; // zero out the top byte because
+                                // SPE PC is 7 bytes
 
   entry->pc = pc;
 
