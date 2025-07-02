@@ -16,10 +16,10 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define GRV_FREQ 2800000000        // 2.8 GHz
+#define GRV_FREQ 2800000000 // 2.8 GHz
 
-#define DEFAULT_PERIOD 1000        // in milliseconds
-#define DEFAULT_SPE_FREQ 1000      // in Hz
+#define DEFAULT_PERIOD 1000   // in milliseconds
+#define DEFAULT_SPE_FREQ 1000 // in Hz
 #define DEFAULT_LOAD_FILTER 0
 #define DEFAULT_TIMEOUT 60 // in seconds
 

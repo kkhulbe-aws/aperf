@@ -321,7 +321,8 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
     return NULL;
   }
 
-  snprintf(dinfo->source_file_line, sizeof(dinfo->source_file_line), "%s", "???");
+  snprintf(dinfo->source_file_line, sizeof(dinfo->source_file_line), "%s",
+           "???");
   snprintf(dinfo->assembly, sizeof(dinfo->assembly), "%s", "???");
 
   if (info) {
