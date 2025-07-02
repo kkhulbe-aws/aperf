@@ -44,6 +44,10 @@ struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid) {
   maps->pid = pid;
   maps->capacity = 16;
   maps->maps = malloc(maps->capacity * sizeof(struct map_entry));
+  if (!maps->maps) {
+    printf("allocating maps for pid %lu failed\n", pid);
+    exit(EXIT_FAILURE);
+  }
   maps->next = table->buckets[hash];
   table->buckets[hash] = maps;
 
@@ -57,6 +61,12 @@ void handle_mmap2_record(struct pid_maps_table *table,
   if (maps->count >= maps->capacity) {
     maps->capacity *= 2;
     maps->maps = realloc(maps->maps, maps->capacity * sizeof(struct map_entry));
+
+    if (!maps->maps) {
+      printf("reallocating maps failed\n");
+      exit(EXIT_FAILURE);
+    }
+
   }
 
   struct map_entry *entry = &maps->maps[maps->count];
