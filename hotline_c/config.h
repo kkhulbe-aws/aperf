@@ -23,9 +23,11 @@
 #define DEFAULT_LOAD_FILTER 0
 #define DEFAULT_TIMEOUT 60 // in seconds
 
+// Referenced from ARM Neoverse V2 Core TRM, Section 22
+// and ARM SPE Performance Analysis Methodology White Paper, Section 2
 #define PERF_ARM_SPE_RAW_TYPE 0xc // ARM specific type
 #define PERF_ARM_SPE_RAW_CONFIG                                                \
-  0x10001 // enable load collection, branch collection, and load filtering
+  0x10001 // enable load collection, branch collection
 #define PERF_FORMAT_SPE 0x10
 
 #define AUX_WATERMARK                                                          \
