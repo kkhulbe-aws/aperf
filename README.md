@@ -38,7 +38,7 @@ Download the binary from the [Releases](https://github.com/aws/APerf/releases) p
 ### Building from source
 1. Download the source code from the [Releases](https://github.com/aws/APerf/releases) page.
 2. The ARM SPE in-memory profiling tool, hotline, is enabled by default and requires having
-    a. Kernel drivers for SPE enabled and with appropriate permissions
+    a. Kernel drivers for SPE enabled and with appropriate permissions. This is the `arm_spe_pmu` kernel module, enabled with `CONFIG_ARM_SPE_PMU`. Only supported on Grv 3/4 *metal* instances.
     b. The following development packages *on your build machine*. On Debian/Ubuntu systems, you can use 
 ```bash
 sudo apt-get install \
@@ -141,8 +141,6 @@ To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 `-F, --perf-frequency` frequency for perf profiling in Hz (default 99)
 
 `--profile-java` profile JVMs by PID or name using async-profiler (default profiles all JVMs)
-
-`--spe-wakeup-period` wake up period (ms) **[hotline tool]**
 
 `--spe-sample-frequency` ARM SPE sampling period (Hz) **[hotline tool]**
 

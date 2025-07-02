@@ -4,6 +4,7 @@
 #include <assert.h>
 #include <ctype.h>
 #include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,9 +38,6 @@
 #define PEER_CLUSTER 0b1100
 #define REMOTE 0b1101
 #define DRAM 0b1110
-
-#define GRV3 0xd40
-#define GRV4 0xd4f
 
 /// @brief overall statistics counters, for debugging the tool
 struct spe_stats {
@@ -77,20 +75,24 @@ struct __attribute__((packed)) spe_record {
   uint8_t type;
   uint8_t reg;
   uint8_t identifier;
-  uint8_t events_packet[4];
+  uint32_t events_packet;
   uint8_t __reserved4;
-  uint8_t issue_lat[2];
+  // uint8_t issue_lat[2];
+  uint16_t issue_lat;
   uint8_t __reserved5;
-  uint8_t total_lat[2];
+  // uint8_t total_lat[2];
+  uint16_t total_lat;
   uint64_t vaddr;
   uint8_t __reserved6;
   uint8_t __reserved7;
-  uint8_t x_lat[2];
+  // uint8_t x_lat[2];
+  uint16_t x_lat;
   uint8_t __reserved8[9];
   uint8_t __reserved9;
   uint8_t data_source;
   uint8_t __reserved10;
-  uint8_t timestamp[8];
+  // uint8_t timestamp[8];
+  uint64_t timestamp;
 };
 
 /// @brief itrace_record spec from
@@ -230,10 +232,12 @@ extern uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc);
 ///        branch or load entries for a given PC based on the aux_entry flags.
 /// @param session current CPU session
 /// @param entry aux entry to update with
+/// @param config CPU configurations, used for cache binning
 /// @return true if the record was successfully put into the B-Tree, false
 /// otherwise
 extern bool handle_aux_record(struct cpu_session *session,
-                              struct aux_entry *entry);
+                              struct aux_entry *entry,
+                              struct arg_config *config);
 
 /// @brief The bulk of the CPU time goes into this. Loops through the aux buffer
 /// from the last read
@@ -241,9 +245,11 @@ extern bool handle_aux_record(struct cpu_session *session,
 ///        timestamp, i.e. process the
 //         record buffer up to the last entry before this time stamp.
 /// @param pmu PMU with the buffer pointers
+/// @param config CPU configurations, used for cache binning
 /// @param session current CPU session
 extern void traverse_buffers(struct arm_spe_pmu *pmu,
-                             struct cpu_session *session);
+                             struct cpu_session *session,
+                             struct arg_config *config);
 
 /// @brief Iterates through the record buffer, handling MMAP2, EXIT, and
 /// SWITCH_CPU_WIDE records as they come

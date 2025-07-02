@@ -17,6 +17,8 @@
 #include <unistd.h>
 
 #define GRV_FREQ 2800000000 // 2.8 GHz
+#define GRV3 0xd40
+#define GRV4 0xd4f
 
 #define DEFAULT_PERIOD 1000   // in milliseconds
 #define DEFAULT_SPE_FREQ 1000 // in Hz
@@ -46,6 +48,9 @@ struct arg_config {
   uint32_t load_filter;
   uint32_t timeout;
   uint8_t throttle;
+  uint64_t l1_bin;
+  uint64_t l2_bin;
+  uint64_t l3_bin;
 };
 
 struct arm_spe_pmu {

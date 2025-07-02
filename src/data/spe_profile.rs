@@ -177,7 +177,7 @@ impl CollectData for SPEProfileRaw {
             let args = vec![
                 CString::new("hotline").unwrap(),
                 CString::new("--period").unwrap(),
-                CString::new(params.spe_wakeup_period.to_string()).unwrap(),
+                CString::new(params.interval.to_string()).unwrap(),
                 CString::new("--spe_sample_frequency").unwrap(),
                 CString::new(params.spe_sample_frequency.to_string()).unwrap(),
                 CString::new("--timeout").unwrap(),

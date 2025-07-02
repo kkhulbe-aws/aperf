@@ -99,7 +99,6 @@ pub fn record(record: &Record, tmp_dir: &Path, runlog: &Path) -> Result<()> {
     }
 
     params.spe_sample_frequency = record.spe_sample_frequency;
-    params.spe_wakeup_period = record.spe_wakeup_period;
 
     match &record.profile_java {
         Some(j) => {

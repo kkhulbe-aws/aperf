@@ -62,7 +62,7 @@ pub struct CollectorParams {
     pub pmu_config: Option<PathBuf>,
     pub perf_frequency: u32,
     pub spe_sample_frequency: u32,
-    pub spe_wakeup_period: u32,
+    pub interval: u64
 }
 
 impl CollectorParams {
@@ -80,7 +80,7 @@ impl CollectorParams {
             pmu_config: Option::None,
             perf_frequency: 99,
             spe_sample_frequency: 1000,
-            spe_wakeup_period: 1000,
+            interval: 1000
         }
     }
 }
@@ -141,9 +141,9 @@ impl DataType {
         self.collector_params.tmp_dir = param.tmp_dir.clone();
         self.collector_params.runlog = param.runlog.clone();
         self.collector_params.pmu_config = param.pmu_config.clone();
+        self.collector_params.interval = param.interval;
 
         self.collector_params.spe_sample_frequency = param.spe_sample_frequency.clone();
-        self.collector_params.spe_wakeup_period = param.spe_wakeup_period.clone();
 
         self.file_handle = Some(
             OpenOptions::new()

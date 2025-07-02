@@ -48,11 +48,11 @@ extern int build_report();
  * +---------------+---------------+
  *                 ^
  *                 |
- * +---------+    +----------+    +-----------+
- * | Session |    |          |    | hotline   |
- * | current |----> Main loop<----+ B-Tree    |
- * |  PID    |    |          |    |           |
- * +---------+    +----------+    +-----------+
+ * +---------+    +-----------+    +-----------+
+ * | Session |    |           |    | hotline   |
+ * | current |----> Main loop <----+ B-Tree    |
+ * |  PID    |    |           |    |           |
+ * +---------+    +-----------+    +-----------+
  *                     ^                |
  *                     |                |
  *                     |                v
@@ -80,21 +80,6 @@ const char *get_hotline_dir() {
 const char *get_hotline_report_dir() {
   const char *env_dir = getenv("HOTLINE_REPORT_DIR");
   return env_dir ? env_dir : "";
-}
-
-int get_hotline_verbose() { return 1; }
-
-void print_progress_bar(int percentage) {
-  printf("\rProgress: [");
-  for (int i = 0; i < 50; i++) {
-    if (i < percentage / 2) {
-      printf("=");
-    } else {
-      printf(" ");
-    }
-  }
-  printf("] %d%%", percentage);
-  fflush(stdout);
 }
 
 void signal_handler(int signum) {
@@ -181,6 +166,7 @@ void commit_to_file() {
 int hotline_main(int argc, char *argv[]) {
   struct arg_config config;
   parse_arguments(argc, argv, &config);
+  configure_cache_bins(&config);
   struct arm_spe_pmu pmus[config.num_cpu];
 
   struct cpu_session sessions[config.num_cpu];
@@ -220,10 +206,10 @@ int hotline_main(int argc, char *argv[]) {
   uint64_t iters = config.timeout / ((double)config.period / 1000);
   // main event loop
   for (int itr = 0; itr < iters; itr++) {
-    usleep(1000 * config.period);
+    sleep(config.period);
 
     for (int i = 0; i < config.num_cpu; i++) {
-      traverse_buffers(&pmus[i], &sessions[i]);
+      traverse_buffers(&pmus[i], &sessions[i], &config);
     }
   }
 

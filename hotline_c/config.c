@@ -57,6 +57,47 @@ void parse_arguments(int argc, char *argv[], struct arg_config *config) {
   }
 }
 
+uint64_t get_cpu_part_num() {
+  FILE *fp;
+  char line[256];
+  uint64_t part_num = 0;
+
+  fp = fopen("/proc/cpuinfo", "r");
+  if (fp == NULL) {
+    perror("Error opening /proc/cpuinfo");
+    return 0;
+  }
+
+  while (fgets(line, sizeof(line), fp)) {
+    if (strncmp(line, "CPU part", 8) == 0) {
+      sscanf(line, "CPU part\t: 0x%lx", &part_num);
+      break;
+    }
+  }
+
+  fclose(fp);
+  return part_num;
+}
+
+void configure_cache_bins(struct arg_config *config) {
+
+  switch (get_cpu_part_num()) {
+  case GRV3:
+    config->l1_bin = 5;  // 1.8 ns
+    config->l2_bin = 16; // 5.7 ns
+    config->l3_bin = 95; // 34 ns
+    break;
+  case GRV4:
+    config->l1_bin = 4;  // 1.5 ns
+    config->l2_bin = 14; // 5.0 ns
+    config->l3_bin = 87; // 31 ns
+    break;
+  default:
+    printf("Invalid CPU part number detected. \n");
+    exit(EXIT_FAILURE);
+  }
+}
+
 // spe configurations were determined through several `strace` runs on `perf
 // record`
 configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
@@ -93,9 +134,9 @@ configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
 
 void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config) {
   uint64_t page_sz = getpagesize();
-  uint64_t num_pages_required = 1024;
+  uint64_t num_pages_required = 4096;
   uint64_t mmap_data_size = num_pages_required * page_sz;
-  uint64_t aux_size = 2800000000 * config->period / config->spe_period *
+  uint64_t aux_size = GRV_FREQ * 1000 * config->period / config->spe_period *
                       16; // add overestimate of 16x to reduce probability of
                           // buffer overfill and data loss
   aux_size = (uint64_t)pow(2, ceil(log2((double)aux_size)));

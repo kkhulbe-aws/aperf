@@ -1,50 +1,6 @@
 #include "auxtrace.h"
 #include "vm_spe_btree.h"
 
-uint64_t L1_BOUND_BIN = 0;
-uint64_t L2_BOUND_BIN = 0;
-uint64_t L3_BOUND_BIN = 0;
-
-uint64_t get_cpu_part_num() {
-  FILE *fp;
-  char line[256];
-  uint64_t part_num = 0;
-
-  fp = fopen("/proc/cpuinfo", "r");
-  if (fp == NULL) {
-    perror("Error opening /proc/cpuinfo");
-    return 0;
-  }
-
-  while (fgets(line, sizeof(line), fp)) {
-    if (strncmp(line, "CPU part", 8) == 0) {
-      sscanf(line, "CPU part\t: 0x%lx", &part_num);
-      break;
-    }
-  }
-
-  fclose(fp);
-  return part_num;
-}
-
-void setup_completion_bins() {
-  switch (get_cpu_part_num()) {
-  case GRV3:
-    L1_BOUND_BIN = 5;  // 1.8 ns
-    L2_BOUND_BIN = 16; // 5.7 ns
-    L3_BOUND_BIN = 95; // 34 ns
-    break;
-  case GRV4:
-    L1_BOUND_BIN = 4;  // 1.5 ns
-    L2_BOUND_BIN = 14; // 5.0 ns
-    L3_BOUND_BIN = 87; // 31 ns
-    break;
-  default:
-    printf("Invalid CPU part number detected. \n");
-    exit(EXIT_FAILURE);
-  }
-}
-
 void parse_record(struct spe_record *record, struct aux_entry *entry) {
   // parsing logic to get what we want out of the record
   // the byte shifts are intentional. Rather than just reversing bytes,
@@ -60,33 +16,24 @@ void parse_record(struct spe_record *record, struct aux_entry *entry) {
 
   entry->type = record->type;
 
-  uint16_t total_lat =
-      (uint16_t)record->total_lat[0] | ((uint16_t)record->total_lat[1] << 8);
-  uint16_t issue_lat =
-      (uint16_t)record->issue_lat[0] | ((uint16_t)record->issue_lat[1] << 8);
-  entry->issue_lat = issue_lat;
-  entry->total_lat = total_lat;
+  entry->total_lat = record->total_lat;
+  entry->issue_lat = record->issue_lat;
 
-  if (issue_lat == AUX_SATURATED_WATERMARK &&
-      total_lat == AUX_SATURATED_WATERMARK) {
+  if (entry->issue_lat == AUX_SATURATED_WATERMARK &&
+      entry->total_lat == AUX_SATURATED_WATERMARK) {
     entry->saturated = 1;
   } else
     entry->saturated = 0;
 
-  uint32_t events_packet = ((uint32_t)record->events_packet[0]) |
-                           ((uint32_t)record->events_packet[1] << 8) |
-                           ((uint32_t)record->events_packet[2] << 16) |
-                           ((uint32_t)record->events_packet[3] << 24);
+  uint32_t events_packet = record->events_packet;
 
   if (events_packet & EVENT_RETIRED)
     entry->retired = 1;
 
   // packet specific information for loads and branches
   if (record->type == AUX_RECORD_LOAD) {
-    uint16_t x_lat =
-        (uint32_t)record->x_lat[0] | ((uint32_t)record->x_lat[1] << 8);
     entry->load.data_source = record->data_source;
-    entry->load.x_lat = x_lat;
+    entry->load.x_lat = record->x_lat;
   } else if (record->type == AUX_RECORD_BRANCH) {
     entry->branch.not_taken = (events_packet & EVENT_BRANCH_NOT_TAKEN) ? 1 : 0;
     entry->branch.mispredicted = (events_packet & EVENT_BRANCH_MISS) ? 1 : 0;
@@ -232,7 +179,8 @@ void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session,
   pmu->meta_page->data_tail = data_tail;
 }
 
-void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session) {
+void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session,
+                      struct arg_config *config) {
   void *aux = pmu->aux_buffer;
   uint64_t aux_size = pmu->meta_page->aux_size;
   uint64_t aux_head = pmu->meta_page->aux_head;
@@ -240,22 +188,19 @@ void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session) {
 
   uint64_t last_processed_ts = 0;
 
+  uint64_t count = 0;
+
   // ensure we don't read past the head
   while (aux_tail + sizeof(struct spe_record) <= aux_head) {
     struct spe_record *record =
         (struct spe_record *)(aux + (aux_tail % aux_size));
 
-    // extract timestamp
-    uint8_t *ts = record->timestamp;
-    uint64_t timestamp = (uint64_t)ts[0] | ((uint64_t)ts[1] << 8) |
-                         ((uint64_t)ts[2] << 16) | ((uint64_t)ts[3] << 24) |
-                         ((uint64_t)ts[4] << 32) | ((uint64_t)ts[5] << 40) |
-                         ((uint64_t)ts[6] << 48) | ((uint64_t)ts[7] << 56);
+    uint64_t timestamp = record->timestamp;
 
     uint64_t perf_ts = tsc_to_perf_time(timestamp, &session->conv);
 
     // only process if this timestamp is greater than our last processed
-    // timestamp
+    // timestamp. Edge case guard for buffer wrap arounds.
     if (perf_ts >= last_processed_ts) {
       struct aux_entry entry;
       parse_record(record, &entry);
@@ -264,7 +209,7 @@ void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session) {
       upgrade_ts(pmu, session, perf_ts);
 
       // process the aux record itself
-      handle_aux_record(session, &entry);
+      handle_aux_record(session, &entry, config);
 
       last_processed_ts = perf_ts;
     }
@@ -276,7 +221,8 @@ void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session) {
   }
 }
 
-bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry) {
+bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry,
+                       struct arg_config *config) {
   pid_t pid = session->pid;
   struct pid_maps *maps = get_pid_maps(mapping_table, pid);
   char *filename;
@@ -304,8 +250,13 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry) {
     new_entry.type = entry->type;
     new_entry.file_id = file_id;
     new_entry.offset = file_off;
+
+    // if saturated, copy over the current btree entry (we're not updating
+    // statistics if saturated) if the entry exists and increment saturated
+    // by 1.
     if (entry->saturated == 1) {
-      memcpy(&new_entry, &btree_entry, sizeof(struct vm_spe_btree_entry));
+      if (btree_entry)
+        memcpy(&new_entry, &btree_entry, sizeof(struct vm_spe_btree_entry));
       new_entry.saturated_packets =
           btree_entry ? btree_entry->saturated_packets + 1 : 1;
       btree_set(vm_spe_tr, &new_entry);
@@ -319,6 +270,9 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry) {
     new_entry.issue_latency =
         btree_entry ? btree_entry->issue_latency + entry->issue_lat
                     : entry->issue_lat;
+
+    new_entry.saturated_packets =
+        btree_entry ? btree_entry->saturated_packets : 0;
 
     if (entry->type == AUX_RECORD_LOAD) {
       struct completion_hist l1, l2, l3, dram;
@@ -357,11 +311,11 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry) {
         break;
       }
 
-      if (execution_latency < L1_BOUND_BIN)
+      if (execution_latency < config->l1_bin)
         bin->bin_1++;
-      else if (execution_latency < L2_BOUND_BIN)
+      else if (execution_latency < config->l2_bin)
         bin->bin_2++;
-      else if (execution_latency < L3_BOUND_BIN)
+      else if (execution_latency < config->l3_bin)
         bin->bin_3++;
       else
         bin->bin_4++;
@@ -373,8 +327,6 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry) {
       new_entry.load_entry.l2 = l2;
       new_entry.load_entry.l3 = l3;
       new_entry.load_entry.dram = dram;
-      // new_entry.saturated_packets = btree_entry ?
-      // btree_entry->saturated_packets : 0;
       btree_set(vm_spe_tr, &new_entry);
       return true;
     } else if (entry->type == AUX_RECORD_BRANCH) {
@@ -387,8 +339,6 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry) {
                             entry->branch.mispredicted
                       : entry->branch.mispredicted;
       new_entry.branch_entry.branch_type = entry->branch.branch_type;
-      // new_entry.saturated_packets = btree_entry ?
-      // btree_entry->saturated_packets : 0;
       btree_set(vm_spe_tr, &new_entry);
       return true;
     }
