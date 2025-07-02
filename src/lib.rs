@@ -564,8 +564,7 @@ pub struct InitParams {
     pub tmp_dir: PathBuf,
     pub runlog: PathBuf,
     pub perf_frequency: u32,
-    pub num_cpu: u32,
-    pub spe_period: u32,
+    pub spe_sample_frequency: u32,
     pub spe_wakeup_period: u32,
 }
 
@@ -607,8 +606,7 @@ impl InitParams {
             tmp_dir: PathBuf::from(APERF_TMP),
             runlog: PathBuf::new(),
             perf_frequency: 99,
-            num_cpu: 64,
-            spe_period: 2800000,
+            spe_sample_frequency: 1000,
             spe_wakeup_period: 1000
         }
     }

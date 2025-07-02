@@ -38,14 +38,6 @@
 #define REMOTE 0b1101
 #define DRAM 0b1110
 
-#define THROTTLE_LIMIT                                                         \
-  64000 // entries / second
-        // if set, we will only process 50k ordered entries. rest will be
-        // dropped given enough sampling time, the throttled method and
-        // unthrottled will converge this throttle allows THROTTLE_LIMIT record
-        // entries, and THROTTLE_LIMIT aux entries
-#define AUX_THROTTLE_LIMIT 24000 // entries / second
-
 #define GRV3 0xd40
 #define GRV4 0xd4f
 

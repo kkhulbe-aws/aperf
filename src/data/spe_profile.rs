@@ -176,16 +176,12 @@ impl CollectData for SPEProfileRaw {
         {
             let args = vec![
                 CString::new("hotline").unwrap(),
-                CString::new("--num_cpu").unwrap(),
-                CString::new(params.num_cpu.to_string()).unwrap(),
                 CString::new("--period").unwrap(),
                 CString::new(params.spe_wakeup_period.to_string()).unwrap(),
-                CString::new("--spe_period").unwrap(),
-                CString::new(params.spe_period.to_string()).unwrap(),
+                CString::new("--spe_sample_frequency").unwrap(),
+                CString::new(params.spe_sample_frequency.to_string()).unwrap(),
                 CString::new("--timeout").unwrap(),
                 CString::new((params.collection_time - 1).to_string()).unwrap(),
-                CString::new("--throttle").unwrap(),
-                CString::new(0.to_string()).unwrap(),
             ];
 
             let argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();

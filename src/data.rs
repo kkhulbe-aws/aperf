@@ -61,9 +61,8 @@ pub struct CollectorParams {
     pub runlog: PathBuf,
     pub pmu_config: Option<PathBuf>,
     pub perf_frequency: u32,
-    pub spe_period: u32,
+    pub spe_sample_frequency: u32,
     pub spe_wakeup_period: u32,
-    pub num_cpu: u32,
 }
 
 impl CollectorParams {
@@ -80,8 +79,7 @@ impl CollectorParams {
             runlog: PathBuf::new(),
             pmu_config: Option::None,
             perf_frequency: 99,
-            num_cpu: 64,
-            spe_period: 2800000,
+            spe_sample_frequency: 1000,
             spe_wakeup_period: 1000,
         }
     }
@@ -144,8 +142,7 @@ impl DataType {
         self.collector_params.runlog = param.runlog.clone();
         self.collector_params.pmu_config = param.pmu_config.clone();
 
-        self.collector_params.num_cpu = param.num_cpu.clone();
-        self.collector_params.spe_period = param.spe_period.clone();
+        self.collector_params.spe_sample_frequency = param.spe_sample_frequency.clone();
         self.collector_params.spe_wakeup_period = param.spe_wakeup_period.clone();
 
         self.file_handle = Some(

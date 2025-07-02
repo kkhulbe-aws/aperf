@@ -11,19 +11,19 @@ long perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu,
 
 void parse_arguments(int argc, char *argv[], struct arg_config *config) {
   config->period = DEFAULT_PERIOD;
-  config->spe_period = DEFAULT_SPE_PERIOD;
+  config->spe_period = (int) ( (double)GRV_FREQ / DEFAULT_SPE_FREQ );
   config->num_cpu = sysconf(_SC_NPROCESSORS_ONLN);
   config->load_filter = DEFAULT_LOAD_FILTER;
   config->timeout = DEFAULT_TIMEOUT;
   config->throttle = 0; // no throttling by default
+                        // currently unused, but if we notice
+                        // CPU usage is higher than desired,
+                        // we can add throttling
 
   static struct option long_options[] = {
       {"period", required_argument, 0, 'p'},
-      {"spe_period", required_argument, 0, 's'},
-      {"num_cpu", required_argument, 0, 'n'},
-      {"load_filter", required_argument, 0, 'l'},
+      {"spe_sample_frequency", required_argument, 0, 's'},
       {"timeout", required_argument, 0, 't'},
-      {"throttle", required_argument, 0, 'r'},
       {0, 0, 0, 0}};
 
   int option_index = 0;
@@ -36,13 +36,7 @@ void parse_arguments(int argc, char *argv[], struct arg_config *config) {
       config->period = atoi(optarg);
       break;
     case 's':
-      config->spe_period = atoi(optarg);
-      break;
-    case 'n':
-      config->num_cpu = atoi(optarg);
-      break;
-    case 'l':
-      config->load_filter = atoi(optarg);
+      config->spe_period = (int) ( (double) GRV_FREQ / atoi(optarg) );
       break;
     case 't':
       config->timeout = atoi(optarg);
@@ -51,13 +45,11 @@ void parse_arguments(int argc, char *argv[], struct arg_config *config) {
       config->throttle = atoi(optarg);
       break;
     case '?':
-      printf("Usage: ./<BINARY> --period X --spe_period X --num_cpu X "
-             "--timeout X");
+      printf("Usage: ./<BINARY> --period X --spe_sample_frequency X --timeout X");
       break;
     default:
       printf("Invalid command provided.");
-      printf("Usage: ./<BINARY> --period X --spe_period X --num_cpu X "
-             "--timeout X");
+      printf("Usage: ./<BINARY> --period X --spe_sample_frequency X --timeout X");
       exit(EXIT_FAILURE);
     }
   }
@@ -101,10 +93,11 @@ void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config) {
   uint64_t page_sz = getpagesize();
   uint64_t num_pages_required = 1024;
   uint64_t mmap_data_size = num_pages_required * page_sz;
-  uint64_t aux_size = 2800000000 * config->period / config->spe_period * 16;
+  uint64_t aux_size = 2800000000 * config->period / config->spe_period * 16; // add overestimate of 16x to reduce probability of buffer
+                                                                             // overfill and data loss
   aux_size = (uint64_t)pow(2, ceil(log2((double)aux_size)));
 
-  // add bounds
+  // add bounds so we don't have way too large (or small) buffers.
   if (aux_size < 15)
     aux_size = 1 << 15;
   else if (aux_size > 1 << 30)

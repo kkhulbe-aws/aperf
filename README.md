@@ -142,11 +142,9 @@ To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 
 `--profile-java` profile JVMs by PID or name using async-profiler (default profiles all JVMs)
 
-`--num-cpu` number of CPUs to profile from. ID will be from `0` to `n-1` **[hotline tool]**
-
 `--spe-wakeup-period` wake up period (ms) **[hotline tool]**
 
-`--spe-period` ARM SPE sampling period (cycles) **[hotline tool]**
+`--spe-sample-frequency` ARM SPE sampling period (Hz) **[hotline tool]**
 
 `./aperf record -h`
 

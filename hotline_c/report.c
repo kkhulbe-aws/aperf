@@ -102,38 +102,43 @@ void unload_binary(BinaryInfo *info) {
 
 BinaryInfo *load_binary(const char *filename) {
   BinaryInfo *info = calloc(1, sizeof(BinaryInfo));
-  if (!info)
-    return NULL;
+  if (!info) {
+    printf("Unable to calloc memroy for BinaryInfo\n");
+    exit(EXIT_FAILURE);
+  }
 
-  // Initialize Capstone
+  // initialize Capstone
   if (cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &info->cs_handle) != CS_ERR_OK) {
     fprintf(stderr, "Failed to initialize Capstone\n");
     free(info);
+    exit(EXIT_FAILURE);
     return NULL;
   }
 
-  // Open the file
+  // open the file
   int fd = open(filename, O_RDONLY);
   if (fd < 0) {
-    perror("open");
     cs_close(&info->cs_handle);
+    // invalid file binary provided, or in accessible. We should
+    // still gracefully continue parsing everything else, rather than
+    // failing the report generation.
     printf("nonfatal error. continuing...\n");
     free(info);
     return NULL;
   }
 
-  // Get file size
+  // get file size
   struct stat st;
   if (fstat(fd, &st) < 0) {
-    perror("fstat");
     close(fd);
     cs_close(&info->cs_handle);
     free(info);
+    exit(EXIT_FAILURE);
     return NULL;
   }
   info->size = st.st_size;
 
-  // Map file into memory
+  // map file into memory
   info->map = mmap(NULL, info->size, PROT_READ, MAP_PRIVATE, fd, 0);
   if (info->map == MAP_FAILED) {
     perror("mmap");
@@ -144,21 +149,21 @@ BinaryInfo *load_binary(const char *filename) {
   }
   close(fd);
 
-  // Get ELF header
+  // get ELF header
   info->ehdr = (Elf64_Ehdr *)info->map;
   if (memcmp(info->ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
     fprintf(stderr, "Not an ELF file\n");
     goto error;
   }
 
-  // Get section headers
+  // get section headers
   info->shdr = (Elf64_Shdr *)((char *)info->map + info->ehdr->e_shoff);
 
-  // Get section header string table
+  // get section header string table
   info->shstrtab =
       (char *)info->map + info->shdr[info->ehdr->e_shstrndx].sh_offset;
 
-  // Find important sections
+  // find important sections
   for (int i = 0; i < info->ehdr->e_shnum; i++) {
     char *section_name = info->shstrtab + info->shdr[i].sh_name;
 
@@ -174,14 +179,14 @@ BinaryInfo *load_binary(const char *filename) {
     }
   }
 
-  // Initialize DWARF debug info
+  // initialize DWARF debug info
   info->dwfl = dwfl_begin(&callbacks);
   if (info->dwfl == NULL) {
     fprintf(stderr, "Failed to initialize DWARF reader\n");
     goto error;
   }
 
-  // Load debug info for the binary
+  // load debug info for the binary
   dwfl_report_begin(info->dwfl);
   Dwfl_Module *module =
       dwfl_report_elf(info->dwfl, filename, filename, -1, 0, false);
@@ -196,104 +201,8 @@ BinaryInfo *load_binary(const char *filename) {
 
 error:
   unload_binary(info);
+  exit(EXIT_FAILURE);
   return NULL;
-}
-
-int init_debug_info(const char *filename) {
-  // Initialize Capstone
-  if (cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &debug_info.cs_handle) != CS_ERR_OK) {
-    return -1;
-  }
-
-  // Initialize DWARF
-  debug_info.dwfl = dwfl_begin(&callbacks);
-  if (debug_info.dwfl == NULL) {
-    cs_close(debug_info.cs_handle);
-    return -1;
-  }
-
-  // Open and map the ELF file
-  int fd = open(filename, O_RDONLY);
-  if (fd < 0) {
-    dwfl_end(debug_info.dwfl);
-    cs_close(debug_info.cs_handle);
-    exit(EXIT_FAILURE);
-    return -1;
-  }
-
-  struct stat st;
-  if (fstat(fd, &st) < 0) {
-    printf("Failed to stat file: %s\n", strerror(errno));
-    close(fd);
-    dwfl_end(debug_info.dwfl);
-    cs_close(debug_info.cs_handle);
-    return -1;
-  }
-
-  debug_info.elf_data = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-  if (debug_info.elf_data == MAP_FAILED) {
-    printf("Failed to mmap file: %s\n", strerror(errno));
-    close(fd);
-    dwfl_end(debug_info.dwfl);
-    cs_close(debug_info.cs_handle);
-    return -1;
-  }
-  debug_info.elf_size = st.st_size;
-
-  // Parse ELF header and sections
-  Elf *elf = elf_begin(fd, ELF_C_READ, NULL);
-  if (elf == NULL) {
-    printf("Failed to initialize ELF: %s\n", elf_errmsg(-1));
-    munmap(debug_info.elf_data, debug_info.elf_size);
-    close(fd);
-    dwfl_end(debug_info.dwfl);
-    cs_close(debug_info.cs_handle);
-    return -1;
-  }
-
-  size_t shstrndx;
-  if (elf_getshdrstrndx(elf, &shstrndx) < 0) {
-    elf_end(elf);
-    munmap(debug_info.elf_data, debug_info.elf_size);
-    close(fd);
-    dwfl_end(debug_info.dwfl);
-    cs_close(debug_info.cs_handle);
-    return -1;
-  }
-
-  Elf_Scn *scn = NULL;
-  while ((scn = elf_nextscn(elf, scn)) != NULL) {
-    GElf_Shdr shdr;
-    if (gelf_getshdr(scn, &shdr) != &shdr) {
-      continue;
-    }
-
-    const char *name = elf_strptr(elf, shstrndx, shdr.sh_name);
-    if (name == NULL) {
-      continue;
-    }
-
-    if (strcmp(name, ".text") == 0) {
-      debug_info.text_addr = shdr.sh_addr;
-      debug_info.text_size = shdr.sh_size;
-      debug_info.text_section = debug_info.elf_data + shdr.sh_offset;
-      break;
-    }
-  }
-
-  elf_end(elf);
-
-  // Load the ELF file into DWFL
-  if (dwfl_report_offline(debug_info.dwfl, filename, filename, fd) == NULL) {
-    munmap(debug_info.elf_data, debug_info.elf_size);
-    close(fd);
-    dwfl_end(debug_info.dwfl);
-    cs_close(debug_info.cs_handle);
-    return -1;
-  }
-
-  dwfl_report_end(debug_info.dwfl, NULL, NULL);
-  return 0;
 }
 
 void cleanup_debug_info(void) {
@@ -304,14 +213,6 @@ void cleanup_debug_info(void) {
     dwfl_end(debug_info.dwfl);
   }
   cs_close(debug_info.cs_handle);
-}
-
-void create_output_directory(void) {
-  if (mkdir("output", 0777) == -1) {
-    if (errno != EEXIST) {
-      printf("Error creating output directory: %s\n", strerror(errno));
-    }
-  }
 }
 
 void process_branch_file(const char *filename, BranchEntry *entries,
@@ -326,7 +227,7 @@ void process_branch_file(const char *filename, BranchEntry *entries,
   char line[MAX_LINE];
   *count = 0;
 
-  // Skip header
+  // skip header
   if (fgets(line, sizeof(line), fp) == NULL) {
     fclose(fp);
     return;
@@ -359,7 +260,7 @@ void process_completion_file(const char *filename, CompletionEntry *entries,
   char line[MAX_LINE];
   *count = 0;
 
-  // Skip header
+  // skip header
   if (fgets(line, sizeof(line), fp) == NULL) {
     fclose(fp);
     return;
@@ -410,7 +311,7 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
   char location_with_line[151] = "???";
   char source_line[256] = "???";
 
-  // Allocate memory for assembly string
+  // allocate memory for assembly string
   dinfo->assembly = (char *)malloc(256);
   dinfo->source_file_line = (char *)malloc(256);
   if (!dinfo->assembly || !dinfo->source_file_line) {
@@ -420,11 +321,11 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
     return NULL;
   }
 
-  strcpy(dinfo->source_file_line, "???");
-  strcpy(dinfo->assembly, "???");
+  snprintf(dinfo->source_file_line, sizeof(dinfo->source_file_line), "%s", "???");
+  snprintf(dinfo->assembly, sizeof(dinfo->assembly), "%s", "???");
 
   if (info) {
-    // Get source file information
+    // get source file information
     char *source_file;
     int line_number = 0;
     get_source_info(info, offset, &source_file, &line_number);
@@ -432,7 +333,7 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
       snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
                source_file, line_number);
 
-      // Get source line
+      // get source line
       FILE *f = fopen(source_file, "r");
       if (f) {
         char line[256];
@@ -449,7 +350,7 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
       }
       free(source_file);
     } else {
-      // If no source file is found, use binary with offset
+      // if no source file is found, use binary with offset
       snprintf(location_with_line, sizeof(location_with_line), "%s:0x%lx",
                filename, offset);
     }
@@ -470,7 +371,7 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
         snprintf(temp_assembly, sizeof(temp_assembly), "%s %s",
                  insn[0].mnemonic, insn[0].op_str);
 
-        // Replace commas with spaces
+        // replace commas with spaces
         for (char *p = temp_assembly; *p; p++) {
           if (*p == ',')
             *p = ' ';
@@ -502,7 +403,7 @@ char *get_function_name(BinaryInfo *info, uint64_t addr) {
   return NULL;
 }
 
-// Comparison function for sorting by execution latency
+// comparison function for sorting by execution latency
 int compare_exec_latency(const void *a, const void *b) {
   const CompletionEntry *ea = (const CompletionEntry *)a;
   const CompletionEntry *eb = (const CompletionEntry *)b;
@@ -522,22 +423,20 @@ void generate_exec_latency_view(CompletionEntry *completions,
 
   fprintf(fp, "Avg Exec Latency,Count,Saturated,Location,Function,Assembly\n");
 
-  // Sort completions by execution latency
+  // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
         compare_exec_latency);
 
-  // Process completion entries
-  // Assuming you have a BinaryInfo struct for each file
+  // process completion entries
+  // assuming you have a BinaryInfo struct for each file
 
-  // Process completion entries
+  // process completion entries
   for (int i = 0; i < completion_count; i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
-    // print_source_and_function(completions[i].filename, completions[i].offset,
-    // binary_info);
 
-    // Get function name
+    // get function name
     char *function_name = get_function_name(binary_info, completions[i].offset);
 
     fprintf(fp, "%.2f,%d,%d,%s,%s,%s\n",
@@ -555,12 +454,14 @@ void generate_exec_latency_view(CompletionEntry *completions,
       free(dinfo.assembly);
     if (!function_name)
       free(function_name);
+
+    unload_binary(binary_info);
   }
 
   fclose(fp);
 }
 
-// Comparison function for sorting by execution latency
+// comparison function for sorting by execution latency
 int compare_issue_latency(const void *a, const void *b) {
   const CompletionEntry *ea = (const CompletionEntry *)a;
   const CompletionEntry *eb = (const CompletionEntry *)b;
@@ -579,22 +480,17 @@ void generate_issue_latency_view(CompletionEntry *completions,
 
   fprintf(fp, "Avg Issue Latency,Count,Saturated,Location,Function,Assembly\n");
 
-  // Sort completions by execution latency
+  // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
         compare_issue_latency);
 
-  // Process completion entries
-  // Assuming you have a BinaryInfo struct for each file
-
-  // Process completion entries
+  // process completion entries
   for (int i = 0; i < completion_count; i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
-    // print_source_and_function(completions[i].filename, completions[i].offset,
-    // binary_info);
 
-    // Get function name
+    // get function name
     char *function_name = get_function_name(binary_info, completions[i].offset);
 
     fprintf(fp, "%.2f,%d,%d,%s,%s,%s\n",
@@ -610,12 +506,13 @@ void generate_issue_latency_view(CompletionEntry *completions,
       free(dinfo.assembly);
     if (!function_name)
       free(function_name);
+    unload_binary(binary_info);
   }
 
   fclose(fp);
 }
 
-// Comparison function for sorting by execution latency
+// comparison function for sorting by execution latency
 int compare_x_latency(const void *a, const void *b) {
   const CompletionEntry *ea = (const CompletionEntry *)a;
   const CompletionEntry *eb = (const CompletionEntry *)b;
@@ -627,29 +524,24 @@ void generate_x_latency_view(CompletionEntry *completions,
   REPORT_FILE_PATH("x_lat_view");
   FILE *fp = fopen(filepath, "w");
   if (!fp) {
-    printf("Error creating x.csv: %s\n", strerror(errno));
+    printf("Error creating x_lat_view.csv: %s\n", strerror(errno));
     exit(EXIT_FAILURE);
     return;
   }
 
   fprintf(fp, "Avg X Latency,Count,Saturated,Location,Function,Assembly\n");
 
-  // Sort completions by execution latency
+  // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
         compare_x_latency);
 
-  // Process completion entries
-  // Assuming you have a BinaryInfo struct for each file
-
-  // Process completion entries
+  // process completion entries
   for (int i = 0; i < completion_count; i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
-    // print_source_and_function(completions[i].filename, completions[i].offset,
-    // binary_info);
 
-    // Get function name
+    // get function name
     char *function_name = get_function_name(binary_info, completions[i].offset);
 
     fprintf(fp, "%.2f,%d,%d,%s,%s,%s\n",
@@ -665,12 +557,13 @@ void generate_x_latency_view(CompletionEntry *completions,
       free(dinfo.assembly);
     if (!function_name)
       free(function_name);
+    unload_binary(binary_info);
   }
 
   fclose(fp);
 }
 
-// Comparison function for sorting by execution latency
+// comparison function for sorting by execution latency
 int compare_branch(const void *a, const void *b) {
   const BranchEntry *ea = (const BranchEntry *)a;
   const BranchEntry *eb = (const BranchEntry *)b;
@@ -679,8 +572,11 @@ int compare_branch(const void *a, const void *b) {
 void generate_branch_view(BranchEntry *entries, int count) {
   REPORT_FILE_PATH("branch_view");
   FILE *fp = fopen(filepath, "w");
-  if (!fp)
+  if (!fp) {
+    printf("Error creating branch_view.csv: %s\n", strerror(errno));
+    exit(EXIT_FAILURE);
     return;
+  }
 
   fprintf(fp, "Type,Count,Avg_Total_Lat,Avg_Issue_Lat,Not_Taken,Mispredicted,"
               "Saturated,Location,Function,Assembly\n");
@@ -689,12 +585,9 @@ void generate_branch_view(BranchEntry *entries, int count) {
 
   for (int i = 0; i < count; i++) {
     BinaryInfo *binary_info = load_binary(entries[i].filename);
-    // DebugInfo info = get_debug_info(entries[i].filename, entries[i].offset);
     DebugInfo dinfo = *(get_asm(entries[i].filename, entries[i].offset));
-    // print_source_and_function(completions[i].filename, completions[i].offset,
-    // binary_info);
 
-    // Get function name
+    // get function name
     char *function_name = get_function_name(binary_info, entries[i].offset);
 
     fprintf(fp, "%s,%d,%.2f,%.2f,%d,%d,%d,%s,%s,%s\n",
@@ -705,6 +598,7 @@ void generate_branch_view(BranchEntry *entries, int count) {
             entries[i].not_taken_branches, entries[i].mispredicted,
             entries[i].saturated, dinfo.source_file_line,
             function_name ? function_name : "???", dinfo.assembly);
+    unload_binary(binary_info);
   }
 
   fclose(fp);
@@ -725,7 +619,6 @@ void generate_completion_view(CompletionEntry *entries, int count) {
 
   for (int i = 0; i < count; i++) {
     BinaryInfo *binary_info = load_binary(entries[i].filename);
-    // DebugInfo info = get_debug_info(entries[i].filename, entries[i].offset);
     DebugInfo dinfo = *(get_asm(entries[i].filename, entries[i].offset));
 
     char *function_name = get_function_name(binary_info, entries[i].offset);
@@ -742,7 +635,7 @@ void generate_completion_view(CompletionEntry *entries, int count) {
     int grand_total = l1_total + l2_total + l3_total + dram_total;
 
     if (grand_total == 0) {
-      grand_total = 1; // This will result in 0% for all categories
+      grand_total = 1; // this will result in 0% for all categories
     }
 
     double l1_percent = (double)l1_total / grand_total * 100.0;
@@ -750,7 +643,7 @@ void generate_completion_view(CompletionEntry *entries, int count) {
     double l3_percent = (double)l3_total / grand_total * 100.0;
     double dram_percent = (double)dram_total / grand_total * 100.0;
 
-    // Calculate bin percentages
+    // calculate bin percentages
     double l1_bin_percents[4], l2_bin_percents[4], l3_bin_percents[4],
         dram_bin_percents[4];
 
@@ -785,6 +678,7 @@ void generate_completion_view(CompletionEntry *entries, int count) {
       free(dinfo.assembly);
     if (!function_name)
       free(function_name);
+    unload_binary(binary_info);
   }
 
   fclose(fp);
@@ -809,36 +703,18 @@ int build_report() {
   snprintf(completion_file_path, sizeof(completion_file_path),
            "%s/spe_hotline_loads.bin", report_dir);
 
-  // Process input files
+  // process input files
   process_branch_file(branch_file_path, branch_entries, &branch_count);
 
   process_completion_file(completion_file_path, completion_entries,
                           &completion_count);
 
-  if (branch_count > 0) {
-    // Initialize debug info using the first entry's filename
-    if (init_debug_info(branch_entries[0].filename) < 0) {
-      fprintf(stderr, "Failed to initialize debug info for: %s\n",
-              branch_entries[0].filename);
-      return 1;
-    }
-  } else {
-    fprintf(stderr, "No branch entries found\n");
-    return 1;
-  }
-
-  // Create output directory
-  create_output_directory();
-  printf("Created ouptut dir\n");
-
-  // Generate views
+  // generate views
   generate_exec_latency_view(completion_entries, completion_count);
   generate_issue_latency_view(completion_entries, completion_count);
   generate_x_latency_view(completion_entries, completion_count);
   generate_branch_view(branch_entries, branch_count);
   generate_completion_view(completion_entries, completion_count);
 
-  // Cleanup
-  // cleanup_debug_info();
   return 0;
 }

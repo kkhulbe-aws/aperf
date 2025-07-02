@@ -1,5 +1,4 @@
 #include "auxtrace.h"
-
 #include "vm_spe_btree.h"
 
 uint64_t L1_BOUND_BIN = 0;
@@ -279,7 +278,6 @@ void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session) {
 
 bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry) {
   pid_t pid = session->pid;
-  assert(pid >= 0);
   struct pid_maps *maps = get_pid_maps(mapping_table, pid);
   char *filename;
   uint64_t file_off;

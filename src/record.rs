@@ -39,13 +39,9 @@ pub struct Record {
     #[clap(long, value_parser)]
     pub pmu_config: Option<String>,
 
-    /// Number of CPUs to profile, from id 0 to N-1
-    #[clap(long, value_parser, default_value_t = 64)]
-    pub num_cpu: u32,
-
     /// SPE sampling frequency, defaulted to 1kHz on Grv4.
-    #[clap(long, value_parser, default_value_t = 2800000)]
-    pub spe_period: u32,
+    #[clap(long, value_parser, default_value_t = 1000)]
+    pub spe_sample_frequency: u32,
 
     /// Wakeup period to aggregate SPE buffers, provided in ms.
     #[clap(long, value_parser, default_value_t = 1000)]
@@ -102,8 +98,7 @@ pub fn record(record: &Record, tmp_dir: &Path, runlog: &Path) -> Result<()> {
         params.pmu_config = Some(PathBuf::from(p));
     }
 
-    params.num_cpu = record.num_cpu;
-    params.spe_period = record.spe_period;
+    params.spe_sample_frequency = record.spe_sample_frequency;
     params.spe_wakeup_period = record.spe_wakeup_period;
 
     match &record.profile_java {

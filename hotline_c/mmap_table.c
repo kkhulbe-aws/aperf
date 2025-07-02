@@ -23,6 +23,10 @@ size_t add_global_filename(const char *filename) {
 
 struct pid_maps_table *init_pid_maps() {
   struct pid_maps_table *table = calloc(1, sizeof(struct pid_maps_table));
+  if (!table) {
+    printf("Failed allocation of pid_maps_table. Exiting.\n");
+    exit(EXIT_FAILURE);
+  }
   return table;
 }
 
