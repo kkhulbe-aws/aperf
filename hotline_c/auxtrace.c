@@ -129,7 +129,7 @@ void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session,
       struct ordered_sample *os =
           (struct ordered_sample *)malloc(sizeof(struct ordered_sample));
       if (!os) {
-        // handle allocation failure
+        // skip this record
         goto next_record;
       }
 
