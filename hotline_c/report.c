@@ -24,7 +24,7 @@ extern const char *get_hotline_report_dir();
            get_hotline_report_dir(), filename)
 
 #define PROCESS_LIMIT 200
-#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
 
 typedef struct {
   char filename[256];
@@ -434,7 +434,7 @@ void generate_exec_latency_view(CompletionEntry *completions,
   // assuming you have a BinaryInfo struct for each file
 
   // process completion entries
-  for (int i = 0; i <  MIN(completion_count, PROCESS_LIMIT); i++) {
+  for (int i = 0; i < MIN(completion_count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
@@ -488,7 +488,7 @@ void generate_issue_latency_view(CompletionEntry *completions,
         compare_issue_latency);
 
   // process completion entries
-  for (int i = 0; i <  MIN(completion_count, PROCESS_LIMIT); i++) {
+  for (int i = 0; i < MIN(completion_count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
@@ -613,8 +613,7 @@ void generate_completion_view(CompletionEntry *entries, int count) {
   if (!fp)
     return;
 
-  qsort(entries, count, sizeof(CompletionEntry),
-        compare_exec_latency);
+  qsort(entries, count, sizeof(CompletionEntry), compare_exec_latency);
 
   fprintf(
       fp,

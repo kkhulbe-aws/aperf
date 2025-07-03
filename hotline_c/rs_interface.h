@@ -4,6 +4,6 @@
 #include <stddef.h>
 #include <stdint.h>
 
-void rs_wrapper_error(const char* error_msg);
+void rs_wrapper_error(const char *error_msg);
 
 #endif // RUST_INTERFACE_H_

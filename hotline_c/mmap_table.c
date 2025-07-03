@@ -66,7 +66,6 @@ void handle_mmap2_record(struct pid_maps_table *table,
       rs_wrapper_error("reallocating maps failed\n");
       exit(EXIT_FAILURE);
     }
-
   }
 
   struct map_entry *entry = &maps->maps[maps->count];

@@ -126,8 +126,9 @@ configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
 
   fd = perf_event_open(&attr, -1, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (fd == -1) {
-    rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you on Grv metal with kernel "
-                    "drivers loaded?\n");
+    rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you "
+                     "on Grv metal with kernel "
+                     "drivers loaded?\n");
     exit(EXIT_FAILURE);
   }
   pmu->fd = fd;
@@ -202,8 +203,9 @@ extern void configure_software_PMU(struct arm_spe_pmu *pmu,
   attr.watermark = 1;
   fd = perf_event_open(&attr, -1, pmu->cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (fd == -1) {
-    rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you on Grv metal with kernel "
-                    "drivers loaded?\n");
+    rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you "
+                     "on Grv metal with kernel "
+                     "drivers loaded?\n");
     exit(EXIT_FAILURE);
   }
   pmu->software_fd = fd;
