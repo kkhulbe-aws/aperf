@@ -1,4 +1,5 @@
 #include "config.h"
+#include "rs_interface.h"
 
 #include <math.h>
 
@@ -125,7 +126,8 @@ configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
 
   fd = perf_event_open(&attr, -1, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (fd == -1) {
-    fprintf(stderr, "error opening leader event\n");
+    rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you on Grv metal with kernel "
+                    "drivers loaded?\n");
     exit(EXIT_FAILURE);
   }
   pmu->fd = fd;
@@ -152,7 +154,7 @@ void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config) {
   if ((meta_page = (struct perf_event_mmap_page *)mmap(
            NULL, mmap_data_size + page_sz, PROT_READ | PROT_WRITE, MAP_SHARED,
            pmu->fd, 0)) == MAP_FAILED) {
-    fprintf(stderr, "mmap failed: %m\n");
+    rs_wrapper_error("mmap failed: %m\n");
     exit(EXIT_FAILURE);
   }
 
@@ -162,7 +164,7 @@ void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config) {
   void *aux_buffer = mmap(NULL, aux_size, PROT_READ | PROT_WRITE, MAP_SHARED,
                           pmu->fd, aux_off);
   if (aux_buffer == MAP_FAILED) {
-    fprintf(stderr, "mmap failed: %m\n");
+    rs_wrapper_error("mmap failed: %m\n");
     exit(EXIT_FAILURE);
   }
 
@@ -200,7 +202,7 @@ extern void configure_software_PMU(struct arm_spe_pmu *pmu,
   attr.watermark = 1;
   fd = perf_event_open(&attr, -1, pmu->cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (fd == -1) {
-    fprintf(stderr, "Error opening SPE perf event. Are you on Grv with kernel "
+    rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you on Grv metal with kernel "
                     "drivers loaded?\n");
     exit(EXIT_FAILURE);
   }
@@ -231,12 +233,12 @@ void toggle_pmu(struct arm_spe_pmu *pmu, uint64_t toggle) {
   int ret;
   ret = ioctl(pmu->fd, PERF_EVENT_IOC_ENABLE, 0);
   if (ret == -1) {
-    fprintf(stderr, "toggle failed on hardware PMU");
+    rs_wrapper_error("toggle failed on hardware PMU");
     exit(EXIT_FAILURE);
   }
   ret = ioctl(pmu->software_fd, PERF_EVENT_IOC_ENABLE, 0);
   if (ret == -1) {
-    fprintf(stderr, "toggle failed on software PMU");
+    rs_wrapper_error("toggle failed on software PMU");
     exit(EXIT_FAILURE);
   }
 }

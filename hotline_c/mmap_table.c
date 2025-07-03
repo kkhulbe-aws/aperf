@@ -24,7 +24,7 @@ size_t add_global_filename(const char *filename) {
 struct pid_maps_table *init_pid_maps() {
   struct pid_maps_table *table = calloc(1, sizeof(struct pid_maps_table));
   if (!table) {
-    printf("Failed allocation of pid_maps_table. Exiting.\n");
+    rs_wrapper_error("Failed allocation of pid_maps_table. Exiting.\n");
     exit(EXIT_FAILURE);
   }
   return table;
@@ -45,7 +45,7 @@ struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid) {
   maps->capacity = 16;
   maps->maps = malloc(maps->capacity * sizeof(struct map_entry));
   if (!maps->maps) {
-    printf("allocating maps for pid %lu failed\n", pid);
+    rs_wrapper_error("allocating maps for pid %lu failed\n", pid);
     exit(EXIT_FAILURE);
   }
   maps->next = table->buckets[hash];
@@ -63,7 +63,7 @@ void handle_mmap2_record(struct pid_maps_table *table,
     maps->maps = realloc(maps->maps, maps->capacity * sizeof(struct map_entry));
 
     if (!maps->maps) {
-      printf("reallocating maps failed\n");
+      rs_wrapper_error("reallocating maps failed\n");
       exit(EXIT_FAILURE);
     }
 
@@ -136,27 +136,6 @@ void free_pid_maps(struct pid_maps_table *table, pid_t pid) {
     prev = maps;
     maps = maps->next;
   }
-}
-
-void print_mapping_table(struct pid_maps_table *table) {
-  printf("==== Mapping Table Debug Output ====\n");
-  for (int i = 0; i < PID_MAP_HASH_SIZE; i++) {
-    struct pid_maps *maps = table->buckets[i];
-    while (maps) {
-      printf("PID %d:\n", maps->pid);
-      for (size_t j = 0; j < maps->count; j++) {
-        struct map_entry *entry = &maps->maps[j];
-        printf("  0x%lx - 0x%lx : %s (file offset: 0x%lx)\n", entry->start,
-               entry->end, global_filenames[entry->filename_index],
-               entry->pgoff);
-      }
-      maps = maps->next;
-      if (maps) {
-        printf("  ----\n");
-      }
-    }
-  }
-  printf("====================================\n");
 }
 
 void get_initial_mappings(struct pid_maps_table *table) {

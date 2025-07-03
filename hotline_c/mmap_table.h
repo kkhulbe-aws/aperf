@@ -90,10 +90,6 @@ extern struct pid_maps_table *init_pid_maps(void);
 extern void handle_mmap2_record(struct pid_maps_table *table,
                                 const struct mmap2_mapping *record);
 
-/// @brief Nice helper to visualize mapping table for debugging
-/// @param table table to visualize
-extern void print_mapping_table(struct pid_maps_table *table);
-
 /// @brief We are not given MMAP2 records for already running processes. We
 /// figure this out by
 ///        reading /proc/... to get all active processes and map them in.

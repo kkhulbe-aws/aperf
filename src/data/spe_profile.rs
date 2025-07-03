@@ -15,11 +15,30 @@ use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::os::raw::c_char;
+use log::error;
+use std::ffi::CStr;
 
 #[cfg(feature = "spe")]
 unsafe extern "C" {
     fn hotline_main(argc: c_int, argv: *const *const i8) -> c_int;
     fn build_report();
+}
+
+/*
+This is a rust wrapper for the error! macro. This is so it can be invoked in the
+C functions for consistent error logging.
+*/
+#[no_mangle]
+pub extern "C" fn rs_wrapper_error(error_msg: *const c_char) {
+    let error_str = unsafe {
+        match CStr::from_ptr(error_msg).to_str() {
+            Ok(s) => s,
+            Err(_) => return, // return early if string conversion fails
+        }
+    };
+
+    // call the original error! macro
+    error!("{}", error_str);
 }
 
 pub static SPE_PROFILE_FILE_NAME: &str = "spe_profile";
