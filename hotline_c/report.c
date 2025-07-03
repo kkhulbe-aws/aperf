@@ -11,7 +11,6 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #define MAX_LINE 2048
 #define MAX_ENTRIES 10000
@@ -23,6 +22,9 @@ extern const char *get_hotline_report_dir();
   char filepath[MAX_LINE];                                                     \
   snprintf(filepath, sizeof(filepath), "%s/data/%s.csv",                       \
            get_hotline_report_dir(), filename)
+
+#define PROCESS_LIMIT 200
+#define MIN(a,b) (((a)<(b))?(a):(b))
 
 typedef struct {
   char filename[256];
@@ -432,7 +434,7 @@ void generate_exec_latency_view(CompletionEntry *completions,
   // assuming you have a BinaryInfo struct for each file
 
   // process completion entries
-  for (int i = 0; i < completion_count; i++) {
+  for (int i = 0; i <  MIN(completion_count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
@@ -486,7 +488,7 @@ void generate_issue_latency_view(CompletionEntry *completions,
         compare_issue_latency);
 
   // process completion entries
-  for (int i = 0; i < completion_count; i++) {
+  for (int i = 0; i <  MIN(completion_count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
@@ -537,7 +539,7 @@ void generate_x_latency_view(CompletionEntry *completions,
         compare_x_latency);
 
   // process completion entries
-  for (int i = 0; i < completion_count; i++) {
+  for (int i = 0; i < MIN(completion_count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(completions[i].filename);
     DebugInfo dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
@@ -584,7 +586,7 @@ void generate_branch_view(BranchEntry *entries, int count) {
 
   qsort(entries, count, sizeof(BranchEntry), compare_branch);
 
-  for (int i = 0; i < count; i++) {
+  for (int i = 0; i < MIN(count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(entries[i].filename);
     DebugInfo dinfo = *(get_asm(entries[i].filename, entries[i].offset));
 
@@ -611,6 +613,9 @@ void generate_completion_view(CompletionEntry *entries, int count) {
   if (!fp)
     return;
 
+  qsort(entries, count, sizeof(CompletionEntry),
+        compare_exec_latency);
+
   fprintf(
       fp,
       "L1 (%),L1 bins (%% | %% | %% | %%),L2 (%),L2 bins (%% | %% | %% | %%),"
@@ -618,7 +623,7 @@ void generate_completion_view(CompletionEntry *entries, int count) {
       "%%),"
       "Location,Function,Assembly\n");
 
-  for (int i = 0; i < count; i++) {
+  for (int i = 0; i < MIN(count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(entries[i].filename);
     DebugInfo dinfo = *(get_asm(entries[i].filename, entries[i].offset));
 
