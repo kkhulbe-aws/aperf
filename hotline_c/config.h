@@ -1,6 +1,7 @@
 #ifndef CONFIG_H_
 #define CONFIG_H_
 
+#include "btree.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
@@ -15,6 +16,8 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 #include <unistd.h>
+
+#define MAX_FILENAMES 2000
 
 #define GRV_FREQ 2800000000 // 2.8 GHz
 #define GRV3 0xd40
@@ -127,5 +130,13 @@ extern void reset_all_pmus(struct arm_spe_pmu pmus[],
 /// @param pmu PMU metadata struct
 extern void configure_cpu_session(struct cpu_session *session,
                                   struct arm_spe_pmu *pmu);
+
+extern void cleanup_resources(struct arg_config *config);
+
+extern struct btree *vm_spe_tr;
+extern char *global_filenames[MAX_FILENAMES];
+extern struct pid_maps_table *mapping_table;
+extern struct arm_spe_pmu *pmus;
+extern struct cpu_session *sessions;
 
 #endif // CONFIG_H_

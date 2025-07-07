@@ -1,6 +1,7 @@
 #ifndef MMAP_TABLE_H
 #define MMAP_TABLE_H
 
+#include "config.h"
 #include <ctype.h>
 #include <dirent.h>
 #include <err.h>
@@ -13,8 +14,6 @@
 #include <unistd.h>
 
 #define PID_MAP_HASH_SIZE 1024
-
-#define MAX_FILENAMES 2000
 
 struct map_entry {
   uint64_t start; // virtual address start

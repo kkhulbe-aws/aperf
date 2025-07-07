@@ -53,6 +53,7 @@ void parse_arguments(int argc, char *argv[], struct arg_config *config) {
       printf("Invalid command provided.");
       printf(
           "Usage: ./<BINARY> --period X --spe_sample_frequency X --timeout X");
+      cleanup_resources(config);
       exit(EXIT_FAILURE);
     }
   }
@@ -95,14 +96,15 @@ void configure_cache_bins(struct arg_config *config) {
     break;
   default:
     printf("Invalid CPU part number detected. \n");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
 }
 
 // spe configurations were determined through several `strace` runs on `perf
 // record`
-configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
-                      struct arg_config *config) {
+void configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
+                           struct arg_config *config) {
   long fd;
   struct perf_event_attr attr;
   memset(&attr, 0, sizeof(attr));
@@ -129,6 +131,7 @@ configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
     rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you "
                      "on Grv metal with kernel "
                      "drivers loaded?\n");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
   pmu->fd = fd;
@@ -156,6 +159,7 @@ void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config) {
            NULL, mmap_data_size + page_sz, PROT_READ | PROT_WRITE, MAP_SHARED,
            pmu->fd, 0)) == MAP_FAILED) {
     rs_wrapper_error("mmap failed: %m\n");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
 
@@ -166,6 +170,7 @@ void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config) {
                           pmu->fd, aux_off);
   if (aux_buffer == MAP_FAILED) {
     rs_wrapper_error("mmap failed: %m\n");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
 
@@ -206,6 +211,7 @@ extern void configure_software_PMU(struct arm_spe_pmu *pmu,
     rs_wrapper_error("Error opening SPE perf event. Skipping Hotline. Are you "
                      "on Grv metal with kernel "
                      "drivers loaded?\n");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
   pmu->software_fd = fd;
@@ -220,46 +226,55 @@ void configure_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config) {
     configure_software_PMU(&pmus[i], config);
     mmap_ARM_SPE_cpu(&pmus[i], config);
     ret = fcntl(pmus[i].fd, F_SETFL, O_RDONLY | O_NONBLOCK);
-    if (ret == -1)
+    if (ret == -1) {
+      cleanup_resources(config);
       exit(EXIT_FAILURE);
+    }
     ret = ioctl(pmus[i].software_fd, PERF_EVENT_IOC_SET_OUTPUT, pmus[i].fd);
-    if (ret == -1)
+    if (ret == -1) {
+      cleanup_resources(config);
       exit(EXIT_FAILURE);
+    }
     ret = fcntl(pmus[i].software_fd, F_SETFL, O_RDONLY | O_NONBLOCK);
-    if (ret == -1)
+    if (ret == -1) {
+      cleanup_resources(config);
       exit(EXIT_FAILURE);
+    }
   }
 }
 
-void toggle_pmu(struct arm_spe_pmu *pmu, uint64_t toggle) {
+void toggle_pmu(struct arm_spe_pmu *pmu, uint64_t toggle,
+                struct arg_config *config) {
   int ret;
   ret = ioctl(pmu->fd, PERF_EVENT_IOC_ENABLE, 0);
   if (ret == -1) {
     rs_wrapper_error("toggle failed on hardware PMU");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
   ret = ioctl(pmu->software_fd, PERF_EVENT_IOC_ENABLE, 0);
   if (ret == -1) {
     rs_wrapper_error("toggle failed on software PMU");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
 }
 
 void enable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config) {
   for (int i = 0; i < config->num_cpu; i++) {
-    toggle_pmu(&pmus[i], PERF_EVENT_IOC_ENABLE);
+    toggle_pmu(&pmus[i], PERF_EVENT_IOC_ENABLE, config);
   }
 }
 
 void disable_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config) {
   for (int i = 0; i < config->num_cpu; i++) {
-    toggle_pmu(&pmus[i], PERF_EVENT_IOC_DISABLE);
+    toggle_pmu(&pmus[i], PERF_EVENT_IOC_DISABLE, config);
   }
 }
 
 void reset_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config) {
   for (int i = 0; i < config->num_cpu; i++) {
-    toggle_pmu(&pmus[i], PERF_EVENT_IOC_RESET);
+    toggle_pmu(&pmus[i], PERF_EVENT_IOC_RESET, config);
   }
 }
 
@@ -275,4 +290,54 @@ void configure_cpu_session(struct cpu_session *session,
   session->pid = 0; // maybe switch to calling process?
   session->last_aux_ts = 0;
   session->last_aux_tail = 0;
+}
+
+void cleanup_resources(struct arg_config *config) {
+  if (pmus) {
+    for (int i = 0; i < config->num_cpu; i++) {
+      struct arm_spe_pmu pmu = pmus[i];
+
+      if (pmu.meta_page) {
+        // Get sizes directly from meta page
+        uint64_t data_size =
+            pmu.meta_page->data_offset + pmu.meta_page->data_size;
+        uint64_t aux_size = pmu.meta_page->aux_size;
+
+        // Unmap aux buffer if it exists
+        if (pmu.aux_buffer) {
+          munmap(pmu.aux_buffer, aux_size);
+          pmu.aux_buffer = NULL;
+        }
+
+        // Unmap meta page and data buffer
+        munmap(pmu.meta_page, data_size);
+        pmu.meta_page = NULL;
+        pmu.data_buffer = NULL;
+      }
+
+      // Close the file descriptor if it's open
+      if (pmu.fd >= 0) {
+        close(pmu.fd);
+        pmu.fd = -1;
+      }
+    }
+
+    // Free the PMU array itself
+    free(pmus);
+    pmus = NULL;
+  }
+
+  if (sessions) {
+    free(sessions);
+    sessions = NULL;
+  }
+
+  if (vm_spe_tr) {
+    btree_free(vm_spe_tr);
+    vm_spe_tr = NULL;
+  }
+  if (mapping_table) {
+    free_pid_maps_table(mapping_table);
+    mapping_table = NULL;
+  }
 }

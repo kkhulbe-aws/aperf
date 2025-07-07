@@ -16,6 +16,8 @@ struct btree *vm_spe_tr;
 char *global_filenames[MAX_FILENAMES];
 size_t global_filename_count = 0;
 struct pid_maps_table *mapping_table;
+struct arm_spe_pmu *pmus;
+struct cpu_session *sessions;
 
 extern int build_report();
 
@@ -228,7 +230,7 @@ int hotline_main(int argc, char *argv[]) {
   sessions = calloc(config.num_cpu, sizeof(struct cpu_session));
   if (!sessions) {
     rs_wrapper_error("Failed to allocate session array");
-    free(pmus);
+    cleanup_resources(&config);
     return EXIT_FAILURE;
   }
 
@@ -238,8 +240,7 @@ int hotline_main(int argc, char *argv[]) {
 
   if (sigaction(SIGTERM, &sa, NULL) == -1) {
     rs_wrapper_error("Cannot handle SIGTERM");
-    free(pmus);
-    free(sessions);
+    cleanup_resources(&config);
     return EXIT_FAILURE;
   }
 
@@ -276,9 +277,7 @@ int hotline_main(int argc, char *argv[]) {
 
   // cleanup and exit
   disable_all_pmus(pmus, &config);
-  free(pmus);
-  free(sessions);
-
   commit_to_file();
+  cleanup_resources(&config);
   return EXIT_SUCCESS;
 }
