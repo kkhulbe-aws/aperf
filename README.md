@@ -105,12 +105,6 @@ To compare the results of two different performance runs, use the following comm
 ./aperf custom-pmu
 ```
 
-**aperf spe**
-1. Download the `aperf` binary. Ensure it has in-memory spe support enabled.
-2. Start `aperf spe`
-```
-./aperf spe -r <RUN_NAME> -n <NUM_CPU> -p <PERIOD> -s <SPE_PERIOD> -x <TIMEOUT> -y <THROTTLE>
-```
 3. This will generate the reports in the specified directory, that can then be downloaded and viewed.
 
 ### Example
