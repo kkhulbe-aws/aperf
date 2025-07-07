@@ -3,9 +3,7 @@
 
 void parse_record(struct spe_record *record, struct aux_entry *entry) {
   // parsing logic to get what we want out of the record
-  // the byte shifts are intentional. Rather than just reversing bytes,
-  // we explicitly shift it to make it little endian and architecture
-  // agnostic
+
   uint64_t pc;
   memcpy(&pc, &record->pc, 7);
   pc = pc & 0x00FFFFFFFFFFFFFF; // zero out the top byte because
@@ -18,6 +16,7 @@ void parse_record(struct spe_record *record, struct aux_entry *entry) {
   entry->total_lat = record->total_lat;
   entry->issue_lat = record->issue_lat;
 
+  // it is saturated if both issue_lat and total_lat = 4095
   if (entry->issue_lat == AUX_SATURATED_WATERMARK &&
       entry->total_lat == AUX_SATURATED_WATERMARK) {
     entry->saturated = 1;
@@ -61,9 +60,13 @@ void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session,
   uint64_t data_head = pmu->meta_page->data_head;
   uint64_t data_tail = session->last_record_tail; // use session's last position
   uint64_t data_size = pmu->meta_page->data_size;
-  uint64_t last_ts = session->last_record_ts;
+  uint64_t last_ts =
+      session
+          ->last_record_ts; // use the last recorded timestamp to continue from
 
   // ensure we don't read past the head
+  // we process the records in two phases. We extract the timestamp,
+  // and if it is before the `target_ts`, we handle the record.
   while (data_tail < data_head) {
     // check if we have enough space for at least a header
     if (data_tail + sizeof(struct perf_event_header) > data_head) {
@@ -139,7 +142,7 @@ void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session,
         char filename[filename_len + 1];
         memcpy(filename, ((char *)mmap2_rec) + fixed_size, filename_len);
         filename[filename_len] = '\0'; // ensure null termination
-        os->sample.mmap2_entry.file_id = add_global_filename(filename);
+        os->sample.mmap2_entry.file_id = add_global_filename(filename, config);
       }
 
       os->type = PERF_RECORD_MMAP2;
@@ -237,7 +240,7 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry,
     // load or branch
     // 4. insert into btree
 
-    uint64_t file_id = add_global_filename(filename);
+    uint64_t file_id = add_global_filename(filename, config);
     struct vm_spe_btree_entry key = {
         .file_id = file_id, .offset = file_off, .type = entry->type};
 
@@ -263,6 +266,7 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry,
       return false;
     }
 
+    // these are entries common to both AUX_RECORD_LOAD and AUX_RECORD_BRANCH
     new_entry.retired_insts = btree_entry ? btree_entry->retired_insts + 1 : 1;
     new_entry.total_latency =
         btree_entry ? btree_entry->total_latency + entry->total_lat
@@ -289,6 +293,8 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry,
         dram = btree_entry->load_entry.dram;
       }
 
+      // this logic first determines which bin to increment based on the data
+      // source then based on the latency increments within the sub-bin for that
       struct completion_hist *bin = NULL;
       uint16_t execution_latency =
           entry->total_lat - entry->issue_lat - entry->load.x_lat;
@@ -300,11 +306,13 @@ bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry,
       case (L2):
         bin = &l2;
         break;
+      // assign LOCAL_CLUSTER, PEER_CLUSTER, and SYSTEM_CACHE to L3
       case (LOCAL_CLUSTER):
       case (PEER_CLUSTER):
       case (SYSTEM_CACHE):
         bin = &l3;
         break;
+      // assign REMOTE and DRAM to DRAM
       case (REMOTE):
       case (DRAM):
         bin = &dram;

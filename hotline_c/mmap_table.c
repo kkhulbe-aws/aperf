@@ -9,17 +9,46 @@
  * - Allows removing tables by PID
  */
 
-size_t add_global_filename(const char *filename) {
+size_t add_global_filename(const char *filename, struct arg_config *config) {
+  // initialize if first use
+  if (global_filenames == NULL) {
+    global_filenames = malloc(INITIAL_SIZE * sizeof(char *));
+    if (!global_filenames) {
+
+      return (size_t)-1; // malloc failed
+    }
+    global_filename_capacity = INITIAL_SIZE;
+  }
+
+  // check if filename already exists
   for (size_t i = 0; i < global_filename_count; i++) {
     if (strcmp(global_filenames[i], filename) == 0) {
       return i;
     }
   }
-  if (global_filename_count < MAX_FILENAMES) {
-    global_filenames[global_filename_count] = strdup(filename);
-    return global_filename_count++;
+
+  // grow array if needed
+  if (global_filename_count >= global_filename_capacity) {
+    size_t new_capacity = global_filename_capacity * 2;
+    char **new_array = realloc(global_filenames, new_capacity * sizeof(char *));
+    if (!new_array) {
+      rs_wrapper_error("Failed re-allocation of global filenames. Exiting.\n");
+      cleanup_resources(config);
+      exit(EXIT_FAILURE);
+    }
+    global_filenames = new_array;
+    global_filename_capacity = new_capacity;
   }
-  return (size_t)-1;
+
+  // add new filename
+  global_filenames[global_filename_count] = strdup(filename);
+  if (!global_filenames[global_filename_count]) {
+    rs_wrapper_error("Failed to update global filenames with file.\n");
+    cleanup_resources(config);
+    exit(EXIT_FAILURE);
+  }
+
+  return global_filename_count++;
 }
 
 struct pid_maps_table *init_pid_maps(struct arg_config *config) {
@@ -108,7 +137,7 @@ void free_pid_maps_table(struct pid_maps_table *table) {
   }
   free(table);
 
-  // Free global filenames
+  // free global filenames
   for (size_t i = 0; i < global_filename_count; i++) {
     free(global_filenames[i]);
   }
@@ -179,7 +208,7 @@ void get_initial_mappings(struct pid_maps_table *table,
       if (path[0]) {
         struct mmap2_mapping record = {
             .pid = pid, .addr = start, .len = end - start, .pgoff = offset};
-        record.file_id = add_global_filename(path);
+        record.file_id = add_global_filename(path, config);
 
         handle_mmap2_record(table, &record, config);
       }
@@ -189,30 +218,4 @@ void get_initial_mappings(struct pid_maps_table *table,
   }
 
   closedir(proc_dir);
-}
-
-// @deprecated
-size_t get_pid_maps_table_size(struct pid_maps_table *table) {
-  if (!table)
-    return 0;
-
-  size_t total_size = sizeof(struct pid_maps_table);
-
-  for (int i = 0; i < PID_MAP_HASH_SIZE; i++) {
-    struct pid_maps *maps = table->buckets[i];
-    while (maps) {
-      total_size += sizeof(struct pid_maps);
-      total_size += maps->capacity * sizeof(struct map_entry);
-      maps = maps->next;
-    }
-  }
-
-  // include size of global filenames
-  for (size_t i = 0; i < global_filename_count; i++) {
-    total_size += strlen(global_filenames[i]) + 1; // +1 for null terminator
-  }
-  total_size +=
-      sizeof(char *) * MAX_FILENAMES; // size of global_filenames array
-
-  return total_size;
 }

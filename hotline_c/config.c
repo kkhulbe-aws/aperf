@@ -140,7 +140,9 @@ void configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
 
 void mmap_ARM_SPE_cpu(struct arm_spe_pmu *pmu, struct arg_config *config) {
   uint64_t page_sz = getpagesize();
-  uint64_t num_pages_required = 4096;
+  uint64_t num_pages_required =
+      4096; // independent of sampling period, and hard to predict due to
+            // context switches, so we statically make it a large amount
   uint64_t mmap_data_size = num_pages_required * page_sz;
   uint64_t aux_size = GRV_FREQ * 1000 * config->period / config->spe_period *
                       16; // add overestimate of 16x to reduce probability of
@@ -280,6 +282,8 @@ void reset_all_pmus(struct arm_spe_pmu pmus[], struct arg_config *config) {
 
 void configure_cpu_session(struct cpu_session *session,
                            struct arm_spe_pmu *pmu) {
+  memset(session, 0,
+         sizeof(struct cpu_session)); // zero everything out before populating
   session->conv.cap_user_time_short = 1;
   session->conv.cap_user_time_zero = 1;
   session->conv.time_cycles = pmu->meta_page->time_cycles;
@@ -287,9 +291,11 @@ void configure_cpu_session(struct cpu_session *session,
   session->conv.time_mult = pmu->meta_page->time_mult;
   session->conv.time_shift = pmu->meta_page->time_shift;
   session->conv.time_zero = pmu->meta_page->time_zero;
-  session->pid = 0; // maybe switch to calling process?
+  session->pid = 0;
   session->last_aux_ts = 0;
   session->last_aux_tail = 0;
+  session->last_record_tail = 0;
+  session->last_record_ts = 0;
 }
 
 void cleanup_resources(struct arg_config *config) {
@@ -298,31 +304,31 @@ void cleanup_resources(struct arg_config *config) {
       struct arm_spe_pmu pmu = pmus[i];
 
       if (pmu.meta_page) {
-        // Get sizes directly from meta page
+        // get sizes directly from meta page
         uint64_t data_size =
             pmu.meta_page->data_offset + pmu.meta_page->data_size;
         uint64_t aux_size = pmu.meta_page->aux_size;
 
-        // Unmap aux buffer if it exists
+        // unmap aux buffer if it exists
         if (pmu.aux_buffer) {
           munmap(pmu.aux_buffer, aux_size);
           pmu.aux_buffer = NULL;
         }
 
-        // Unmap meta page and data buffer
+        // unmap meta page and data buffer
         munmap(pmu.meta_page, data_size);
         pmu.meta_page = NULL;
         pmu.data_buffer = NULL;
       }
 
-      // Close the file descriptor if it's open
+      // close the file descriptor if it's open
       if (pmu.fd >= 0) {
         close(pmu.fd);
         pmu.fd = -1;
       }
     }
 
-    // Free the PMU array itself
+    // free the PMU array itself
     free(pmus);
     pmus = NULL;
   }

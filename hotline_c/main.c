@@ -12,10 +12,14 @@
 #include "vm_spe_btree.h"
 
 // global data structures independent of sessions
-struct btree *vm_spe_tr;
-char *global_filenames[MAX_FILENAMES];
-size_t global_filename_count = 0;
-struct pid_maps_table *mapping_table;
+struct btree *vm_spe_tr = NULL; // main btree for all hotline entries
+char **global_filenames = NULL; // global list of shared filenames
+size_t global_filename_count = 0,
+       global_filename_capacity = 0; // current amount of filenames used
+struct pid_maps_table *mapping_table =
+    NULL; // mapping table for the MMAP2 entries
+
+/// cpu, pmu, and configuration information
 struct arm_spe_pmu *pmus;
 struct cpu_session *sessions;
 struct arg_config config;
@@ -76,11 +80,13 @@ extern int build_report();
  * swapped out for the two pointer method.
  */
 
+// assigned via APerf as an environment variable when forking
 const char *get_hotline_dir() {
   const char *env_dir = getenv("HOTLINE_DIR");
   return env_dir ? env_dir : "";
 }
 
+// assigned via APerf as an environment variable when building report
 const char *get_hotline_report_dir() {
   const char *env_dir = getenv("HOTLINE_REPORT_DIR");
   return env_dir ? env_dir : "";
@@ -114,7 +120,7 @@ void commit_to_file(void) {
   }
   branch_fp = fopen(path, "w");
 
-  // Verify file handles
+  // verify file handles
   if (!load_fp || !branch_fp) {
     rs_wrapper_error("Error opening output files\n");
     goto cleanup;

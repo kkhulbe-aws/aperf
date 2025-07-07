@@ -17,8 +17,6 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-#define MAX_FILENAMES 2000
-
 #define GRV_FREQ 2800000000 // 2.8 GHz
 #define GRV3 0xd40
 #define GRV4 0xd4f
@@ -134,7 +132,7 @@ extern void configure_cpu_session(struct cpu_session *session,
 extern void cleanup_resources(struct arg_config *config);
 
 extern struct btree *vm_spe_tr;
-extern char *global_filenames[MAX_FILENAMES];
+extern char **global_filenames;
 extern struct pid_maps_table *mapping_table;
 extern struct arm_spe_pmu *pmus;
 extern struct cpu_session *sessions;

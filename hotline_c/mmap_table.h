@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #define PID_MAP_HASH_SIZE 1024
+#define INITIAL_SIZE 1024
 
 struct map_entry {
   uint64_t start; // virtual address start
@@ -65,6 +66,7 @@ struct __attribute__((packed)) mmap2_mapping {
 /// @brief Sets up, frees, and accesses pid tables
 extern struct pid_maps_table *create_pid_maps_table(void);
 extern void free_pid_maps_table(struct pid_maps_table *table);
+/// @param config configuration struct to standardize cleanup
 extern struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid,
                                      struct arg_config *config);
 
@@ -81,12 +83,14 @@ extern void add_map_entry(struct pid_maps_table *table, pid_t pid,
 extern void remove_pid_maps(struct pid_maps_table *table, pid_t pid);
 
 /// @brief Initializes datastructures
+/// @param config configuration struct to standardize cleanup
 extern struct pid_maps_table *init_pid_maps(struct arg_config *config);
 
 /// @brief Logic to update the PID table given a new MMAP2 record
 /// @param table Table to update
 /// @param record MMAP2 record, read from the record buffer during
 /// `traverse_buffers`
+/// @param config configuration struct to standardize cleanup
 extern void handle_mmap2_record(struct pid_maps_table *table,
                                 const struct mmap2_mapping *record,
                                 struct arg_config *config);
@@ -95,6 +99,7 @@ extern void handle_mmap2_record(struct pid_maps_table *table,
 /// figure this out by
 ///        reading /proc/... to get all active processes and map them in.
 /// @param table Table to map into
+/// @param config configuration struct to standardize cleanup
 extern void get_initial_mappings(struct pid_maps_table *table,
                                  struct arg_config *config);
 
@@ -112,18 +117,14 @@ extern int pc_to_file_offset(struct pid_maps *maps, uint64_t pc,
 ///        function allows adding into it
 /// @param filename filename to add into it
 /// @return returns index at which file was added
-extern size_t add_global_filename(const char *filename);
+extern size_t add_global_filename(const char *filename,
+                                  struct arg_config *config);
 
 /// @brief Frees all the PID datastructures for a given PID
 /// @param table table to clear up
 /// @param pid PID to free
 extern void free_pid_maps(struct pid_maps_table *table, pid_t pid);
 
-/// @brief Helpful utilitity to figure out the total size of the table
-/// @param table input table
-/// @return size of the table
-extern size_t get_pid_maps_table_size(struct pid_maps_table *table);
-
-extern char *global_filenames[MAX_FILENAMES];
-extern size_t global_filename_count;
+extern char **global_filenames;
+extern size_t global_filename_count, global_filename_capacity;
 #endif
