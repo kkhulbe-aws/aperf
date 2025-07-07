@@ -346,4 +346,9 @@ void cleanup_resources(struct arg_config *config) {
     free_pid_maps_table(mapping_table);
     mapping_table = NULL;
   }
+
+  if (global_filenames) {
+    free_global_filenames();
+    global_filenames = NULL;
+  }
 }

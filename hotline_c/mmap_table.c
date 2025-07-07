@@ -136,10 +136,17 @@ void free_pid_maps_table(struct pid_maps_table *table) {
     }
   }
   free(table);
+}
 
-  // free global filenames
-  for (size_t i = 0; i < global_filename_count; i++) {
-    free(global_filenames[i]);
+void free_global_filenames() {
+  if (global_filenames) {
+    for (size_t i = 0; i < global_filename_count; i++) {
+      free(global_filenames[i]);
+    }
+    free(global_filenames);
+    global_filenames = NULL;
+    global_filename_count = 0;
+    global_filename_capacity = 0;
   }
 }
 

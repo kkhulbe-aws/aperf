@@ -125,6 +125,9 @@ extern size_t add_global_filename(const char *filename,
 /// @param pid PID to free
 extern void free_pid_maps(struct pid_maps_table *table, pid_t pid);
 
+/// @brief Frees all the filenames stored
+extern free_global_filenames();
+
 extern char **global_filenames;
 extern size_t global_filename_count, global_filename_capacity;
 #endif
