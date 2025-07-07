@@ -14,6 +14,8 @@
 
 #define MAX_LINE 2048
 #define MAX_ENTRIES 10000
+#define MAX_LINE_LENGTH 256
+#define PATH_MAX 512
 
 extern const char *get_hotline_dir();
 extern const char *get_hotline_report_dir();
@@ -55,6 +57,7 @@ typedef struct {
 typedef struct {
   char *assembly;
   char *source_file_line;
+  char *line;
 } DebugInfo;
 
 typedef struct {
@@ -290,6 +293,49 @@ void process_completion_file(const char *filename, CompletionEntry *entries,
   fclose(fp);
 }
 
+char* get_line_at_line_number(const char* filename, int target_line) {
+    FILE* file = fopen(filename, "r");
+    if (!file) {
+        perror("Error opening file");
+        return "???\0";
+    }
+
+    char* line = malloc(MAX_LINE_LENGTH);
+    if (!line) {
+        fclose(file);
+        perror("Memory allocation failed");
+        return NULL;
+    }
+
+    // Read lines until we reach the target line number
+    int current_line = 1;
+    while (current_line < target_line) {
+        if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
+            // Reached EOF before target line
+            fclose(file);
+            free(line);
+            return NULL;
+        }
+        current_line++;
+    }
+
+    // Read the target line
+    if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
+        fclose(file);
+        free(line);
+        return NULL;
+    }
+
+    // Remove newline character if present
+    size_t len = strlen(line);
+    if (len > 0 && line[len-1] == '\n') {
+        line[len-1] = '\0';
+    }
+
+    fclose(file);
+    return line;
+}
+
 void get_source_info(BinaryInfo *info, uint64_t addr, char **filename,
                      int *line) {
   *filename = NULL;
@@ -303,6 +349,48 @@ void get_source_info(BinaryInfo *info, uint64_t addr, char **filename,
   if (line_info) {
     *filename = strdup(dwfl_lineinfo(line_info, NULL, line, NULL, NULL, NULL));
   }
+}
+
+char* get_absolute_path(const char* debug_file_path, const char* relative_path) {
+    if (!debug_file_path || !relative_path) {
+        return NULL;
+    }
+
+    char *base_dir = strdup(debug_file_path);
+    if (!base_dir) {
+        return NULL;
+    }
+
+    char *last_slash = strrchr(base_dir, '/');
+    if (last_slash) {
+        *(last_slash + 1) = '\0';  // Cut off the filename, keep the directory path
+    }
+
+    // Remove any "./" from the beginning of relative_path
+    while (relative_path[0] == '.' && relative_path[1] == '/') {
+        relative_path += 2;
+    }
+
+    // Skip leading '/' in relative_path if base_dir ends with '/'
+    while (base_dir[strlen(base_dir) - 1] == '/' && relative_path[0] == '/') {
+        relative_path++;
+    }
+
+    char *full_path = malloc(PATH_MAX);
+    if (!full_path) {
+        free(base_dir);
+        return NULL;
+    }
+
+    if (snprintf(full_path, PATH_MAX, "%s%s", base_dir, relative_path) >= PATH_MAX) {
+        // Path too long
+        free(base_dir);
+        free(full_path);
+        return NULL;
+    }
+    
+    free(base_dir);
+    return full_path;
 }
 
 DebugInfo *get_asm(const char *filename, uint64_t offset) {
@@ -331,27 +419,23 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
     // get source file information
     char *source_file;
     int line_number = 0;
+    char *line_s;
     get_source_info(info, offset, &source_file, &line_number);
     if (source_file) {
-      snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
-               source_file, line_number);
+        char *full_path = get_absolute_path(filename, source_file);
+        if (full_path) {
+            snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
+                      full_path, line_number);
+      line_s = get_line_at_line_number(full_path, line_number);
+      free(full_path);
+        } else {
+            snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
+                      source_file, line_number);
+            line_s = "???\0";
+        }
 
       // get source line
-      FILE *f = fopen(source_file, "r");
-      if (f) {
-        char line[256];
-        int current_line = 0;
-        while (fgets(line, sizeof(line), f) && current_line < line_number) {
-          current_line++;
-        }
-        if (current_line == line_number) {
-          line[strcspn(line, "\n")] = 0;
-          strncpy(source_line, line, sizeof(source_line) - 1);
-          source_line[sizeof(source_line) - 1] = '\0';
-        }
-        fclose(f);
-      }
-      free(source_file);
+      dinfo->line = line_s;
     } else {
       // if no source file is found, use binary with offset
       snprintf(location_with_line, sizeof(location_with_line), "%s:0x%lx",
@@ -406,6 +490,7 @@ char *get_function_name(BinaryInfo *info, uint64_t addr) {
   return NULL;
 }
 
+
 // comparison function for sorting by execution latency
 int compare_exec_latency(const void *a, const void *b) {
   const CompletionEntry *ea = (const CompletionEntry *)a;
@@ -424,7 +509,7 @@ void generate_exec_latency_view(CompletionEntry *completions,
     return;
   }
 
-  fprintf(fp, "Avg Exec Latency,Count,Saturated,Location,Function,Assembly\n");
+  fprintf(fp, "Avg Exec Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
@@ -442,19 +527,21 @@ void generate_exec_latency_view(CompletionEntry *completions,
     // get function name
     char *function_name = get_function_name(binary_info, completions[i].offset);
 
-    fprintf(fp, "%.2f,%d,%d,%s,%s,%s\n",
+    fprintf(fp, "%.2f,%d,%d,%s,%s,%s,%s\n",
             (double)(completions[i].total_latency -
                      completions[i].issue_latency -
                      completions[i].translation_latency) /
                 completions[i].retired_insts,
             completions[i].retired_insts, completions[i].saturated,
-            dinfo.source_file_line, function_name ? function_name : "???",
+            dinfo.source_file_line, dinfo.line, function_name ? function_name : "???",
             dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
     if (!dinfo.assembly)
       free(dinfo.assembly);
+    if (!dinfo.line)
+      free(dinfo.line);
     if (!function_name)
       free(function_name);
 
@@ -481,7 +568,7 @@ void generate_issue_latency_view(CompletionEntry *completions,
     return;
   }
 
-  fprintf(fp, "Avg Issue Latency,Count,Saturated,Location,Function,Assembly\n");
+  fprintf(fp, "Avg Issue Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
@@ -496,17 +583,19 @@ void generate_issue_latency_view(CompletionEntry *completions,
     // get function name
     char *function_name = get_function_name(binary_info, completions[i].offset);
 
-    fprintf(fp, "%.2f,%d,%d,%s,%s,%s\n",
+    fprintf(fp, "%.2f,%d,%d,%s,%s,%s,%s\n",
             (double)(completions[i].issue_latency) /
                 completions[i].retired_insts,
             completions[i].retired_insts, completions[i].saturated,
-            dinfo.source_file_line, function_name ? function_name : "???",
+            dinfo.source_file_line, dinfo.line, function_name ? function_name : "???",
             dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
     if (!dinfo.assembly)
       free(dinfo.assembly);
+    if (!dinfo.line)
+      free(dinfo.line);
     if (!function_name)
       free(function_name);
     unload_binary(binary_info);
@@ -532,7 +621,7 @@ void generate_x_latency_view(CompletionEntry *completions,
     return;
   }
 
-  fprintf(fp, "Avg X Latency,Count,Saturated,Location,Function,Assembly\n");
+  fprintf(fp, "Avg X Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
@@ -547,17 +636,19 @@ void generate_x_latency_view(CompletionEntry *completions,
     // get function name
     char *function_name = get_function_name(binary_info, completions[i].offset);
 
-    fprintf(fp, "%.2f,%d,%d,%s,%s,%s\n",
+    fprintf(fp, "%.2f,%d,%d,%s,%s,%s,%s\n",
             (double)(completions[i].translation_latency) /
                 completions[i].retired_insts,
-            completions[i].retired_insts, completions[i].saturated,
-            dinfo.source_file_line, function_name ? function_name : "???",
+            completions[i].retired_insts, completions[i].saturated, 
+            dinfo.source_file_line, dinfo.line, function_name ? function_name : "???",
             dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
     if (!dinfo.assembly)
       free(dinfo.assembly);
+    if (!dinfo.line)
+      free(dinfo.line);
     if (!function_name)
       free(function_name);
     unload_binary(binary_info);
@@ -582,7 +673,7 @@ void generate_branch_view(BranchEntry *entries, int count) {
   }
 
   fprintf(fp, "Type,Count,Avg_Total_Lat,Avg_Issue_Lat,Not_Taken,Mispredicted,"
-              "Saturated,Location,Function,Assembly\n");
+              "Saturated,Location,Line,Function,Assembly\n");
 
   qsort(entries, count, sizeof(BranchEntry), compare_branch);
 
@@ -593,14 +684,23 @@ void generate_branch_view(BranchEntry *entries, int count) {
     // get function name
     char *function_name = get_function_name(binary_info, entries[i].offset);
 
-    fprintf(fp, "%s,%d,%.2f,%.2f,%d,%d,%d,%s,%s,%s\n",
+    fprintf(fp, "%s,%d,%.2f,%.2f,%d,%d,%d,%s,%s,%s,%s\n",
             entries[i].branch_type == 0x01 ? "COND" : "IND",
             entries[i].retired_insts,
             ((double)entries[i].total_latency / entries[i].retired_insts),
             ((double)entries[i].issue_latency / entries[i].retired_insts),
             entries[i].not_taken_branches, entries[i].mispredicted,
-            entries[i].saturated, dinfo.source_file_line,
+            entries[i].saturated, dinfo.source_file_line, dinfo.line,
             function_name ? function_name : "???", dinfo.assembly);
+
+    if (!dinfo.source_file_line)
+      free(dinfo.source_file_line);
+    if (!dinfo.assembly)
+      free(dinfo.assembly);
+    if (!dinfo.line)
+      free(dinfo.line);
+    if (!function_name)
+      free(function_name);
     unload_binary(binary_info);
   }
 
@@ -620,7 +720,7 @@ void generate_completion_view(CompletionEntry *entries, int count) {
       "L1 (%),L1 bins (%% | %% | %% | %%),L2 (%),L2 bins (%% | %% | %% | %%),"
       "L3 (%),L3 bins (%% | %% | %% | %%),DRAM (%),DRAM bins (%% | %% | %% | "
       "%%),"
-      "Location,Function,Assembly\n");
+      "Location,Line,Function,Assembly\n");
 
   for (int i = 0; i < MIN(count, PROCESS_LIMIT); i++) {
     BinaryInfo *binary_info = load_binary(entries[i].filename);
@@ -667,20 +767,22 @@ void generate_completion_view(CompletionEntry *entries, int count) {
     fprintf(fp,
             "%.2f,%.2f | %.2f | %.2f | %.2f,%.2f,%.2f | %.2f | %.2f | "
             "%.2f,%.2f,%.2f | %.2f | %.2f | %.2f,%.2f,%.2f | %.2f | %.2f | "
-            "%.2f,%s,%s,%s\n",
+            "%.2f,%s,%s,%s,%s\n",
             l1_percent, l1_bin_percents[0], l1_bin_percents[1],
             l1_bin_percents[2], l1_bin_percents[3], l2_percent,
             l2_bin_percents[0], l2_bin_percents[1], l2_bin_percents[2],
             l2_bin_percents[3], l3_percent, l3_bin_percents[0],
             l3_bin_percents[1], l3_bin_percents[2], l3_bin_percents[3],
             dram_percent, dram_bin_percents[0], dram_bin_percents[1],
-            dram_bin_percents[2], dram_bin_percents[3], dinfo.source_file_line,
+            dram_bin_percents[2], dram_bin_percents[3], dinfo.source_file_line, dinfo.line,
             function_name ? function_name : "???", dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
     if (!dinfo.assembly)
       free(dinfo.assembly);
+    if (!dinfo.line)
+      free(dinfo.line);
     if (!function_name)
       free(function_name);
     unload_binary(binary_info);
