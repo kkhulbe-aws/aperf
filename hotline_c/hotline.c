@@ -926,7 +926,6 @@ int hotline_main(int argc, char *argv[]) {
   // initialize and configure PMUs
   configure_all_pmus(pmus, &config);
   reset_all_pmus(pmus, &config);
-  enable_all_pmus(pmus, &config);
 
   // configure CPU sessions
   for (int i = 0; i < config.num_cpu; i++) {
@@ -943,6 +942,8 @@ int hotline_main(int argc, char *argv[]) {
   // MMAP2 records
   mapping_table = init_pid_maps(&config);
   get_initial_mappings(mapping_table, &config);
+
+  enable_all_pmus(pmus, &config);
 
   // main event loop
   uint64_t iters = config.timeout / ((double)config.period / 1000);

@@ -1,90 +1,4 @@
-#include <capstone/capstone.h>
-#include <dwarf.h>
-#include <elf.h>
-#include <elfutils/libdw.h>
-#include <elfutils/libdwfl.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdint.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
-
-#define MAX_LINE 2048
-#define MAX_ENTRIES 10000
-#define MAX_LINE_LENGTH 256
-#define PATH_MAX 512
-
-extern const char *get_hotline_dir();
-extern const char *get_hotline_report_dir();
-
-#define REPORT_FILE_PATH(filename)                                             \
-  char filepath[MAX_LINE];                                                     \
-  snprintf(filepath, sizeof(filepath), "%s/data/%s.csv",                       \
-           get_hotline_report_dir(), filename)
-
-#define PROCESS_LIMIT 200
-#define MIN(a, b) (((a) < (b)) ? (a) : (b))
-
-typedef struct {
-  char filename[256];
-  uint64_t offset;
-  int retired_insts;
-  int not_taken_branches;
-  int mispredicted;
-  int total_latency;
-  int issue_latency;
-  int saturated;
-  int branch_type;
-} BranchEntry;
-
-typedef struct {
-  char filename[256];
-  uint64_t offset;
-  int retired_insts;
-  int total_latency;
-  int issue_latency;
-  int translation_latency;
-  int l1_bins[4];
-  int l2_bins[4];
-  int l3_bins[4];
-  int dram_bins[4];
-  int saturated;
-} CompletionEntry;
-
-typedef struct {
-  char *assembly;
-  char *source_file_line;
-  char *line;
-} DebugInfo;
-
-typedef struct {
-  csh cs_handle;
-  Dwfl *dwfl;
-  char *elf_data;
-  size_t elf_size;
-  uint64_t text_addr;
-  uint64_t text_size;
-  void *text_section;
-} DebugInfo_Internal;
-
-typedef struct {
-  void *map;
-  size_t size;
-  Elf64_Ehdr *ehdr;
-  Elf64_Shdr *shdr;
-  char *shstrtab;
-  Elf64_Sym *symtab;
-  char *strtab;
-  int sym_count;
-  void *text_section;
-  uint64_t text_addr;
-  size_t text_size;
-  Dwfl *dwfl;
-  csh cs_handle; // Capstone handle
-} BinaryInfo;
+#include "report.h"
 
 static const Dwfl_Callbacks callbacks = {
     .find_elf = dwfl_build_id_find_elf,
@@ -92,9 +6,9 @@ static const Dwfl_Callbacks callbacks = {
     .section_address = dwfl_offline_section_address,
 };
 
-static DebugInfo_Internal debug_info = {0};
+static debug_info_metadata debug_info = {0};
 
-void unload_binary(BinaryInfo *info) {
+void unload_binary(binary_info *info) {
   if (!info)
     return;
   cs_close(&info->cs_handle);
@@ -105,10 +19,10 @@ void unload_binary(BinaryInfo *info) {
   free(info);
 }
 
-BinaryInfo *load_binary(const char *filename) {
-  BinaryInfo *info = calloc(1, sizeof(BinaryInfo));
+binary_info *load_binary(const char *filename) {
+  binary_info *info = calloc(1, sizeof(binary_info));
   if (!info) {
-    printf("Unable to calloc memroy for BinaryInfo\n");
+    printf("Unable to calloc memroy for binary_info\n");
     exit(EXIT_FAILURE);
   }
 
@@ -220,7 +134,7 @@ void cleanup_debug_info(void) {
   cs_close(debug_info.cs_handle);
 }
 
-void process_branch_file(const char *filename, BranchEntry *entries,
+void process_branch_file(const char *filename, branch_entry *entries,
                          int *count) {
   FILE *fp = fopen(filename, "r");
   if (!fp) {
@@ -239,7 +153,7 @@ void process_branch_file(const char *filename, BranchEntry *entries,
   }
 
   while (fgets(line, sizeof(line), fp) && *count < MAX_ENTRIES) {
-    BranchEntry *entry = &entries[*count];
+    branch_entry *entry = &entries[*count];
     int result = sscanf(line, "%[^,],%lx,%d,%d,%d,%d,%d,%d,%d", entry->filename,
                         &entry->offset, &entry->retired_insts,
                         &entry->not_taken_branches, &entry->mispredicted,
@@ -253,7 +167,7 @@ void process_branch_file(const char *filename, BranchEntry *entries,
   fclose(fp);
 }
 
-void process_completion_file(const char *filename, CompletionEntry *entries,
+void process_completion_file(const char *filename, completion_entry *entries,
                              int *count) {
   FILE *fp = fopen(filename, "r");
   if (!fp) {
@@ -272,7 +186,7 @@ void process_completion_file(const char *filename, CompletionEntry *entries,
   }
 
   while (fgets(line, sizeof(line), fp) && *count < MAX_ENTRIES) {
-    CompletionEntry *entry = &entries[*count];
+    completion_entry *entry = &entries[*count];
     int result = sscanf(
         line,
         "%[^,],%lx,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,"
@@ -296,7 +210,6 @@ void process_completion_file(const char *filename, CompletionEntry *entries,
 char *get_line_at_line_number(const char *filename, int target_line) {
   FILE *file = fopen(filename, "r");
   if (!file) {
-    perror("Error opening file");
     return "???\0";
   }
 
@@ -336,7 +249,7 @@ char *get_line_at_line_number(const char *filename, int target_line) {
   return line;
 }
 
-void get_source_info(BinaryInfo *info, uint64_t addr, char **filename,
+void get_source_info(binary_info *info, uint64_t addr, char **filename,
                      int *line) {
   *filename = NULL;
   *line = 0;
@@ -419,10 +332,10 @@ char *get_absolute_path(const char *base_path, const char *relative_path) {
   return full_path;
 }
 
-DebugInfo *get_asm(const char *filename, uint64_t offset) {
-  BinaryInfo *info = load_binary(filename);
-  DebugInfo *dinfo = (DebugInfo *)malloc(sizeof(DebugInfo));
-  memset(dinfo, 0, sizeof(DebugInfo));
+debug_info_data *get_asm(const char *filename, uint64_t offset) {
+  binary_info *info = load_binary(filename);
+  debug_info_data *dinfo = (debug_info_data *)malloc(sizeof(debug_info_data));
+  memset(dinfo, 0, sizeof(debug_info_data));
 
   char location_with_line[151] = "???";
   char source_line[256] = "???";
@@ -501,7 +414,7 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
   return dinfo;
 }
 
-char *get_function_name(BinaryInfo *info, uint64_t addr) {
+char *get_function_name(binary_info *info, uint64_t addr) {
   if (!info || !info->symtab || !info->strtab)
     return NULL;
 
@@ -518,13 +431,13 @@ char *get_function_name(BinaryInfo *info, uint64_t addr) {
 
 // comparison function for sorting by execution latency
 int compare_exec_latency(const void *a, const void *b) {
-  const CompletionEntry *ea = (const CompletionEntry *)a;
-  const CompletionEntry *eb = (const CompletionEntry *)b;
+  const completion_entry *ea = (const completion_entry *)a;
+  const completion_entry *eb = (const completion_entry *)b;
   return (eb->total_latency - eb->issue_latency - eb->translation_latency) -
          (ea->total_latency - ea->issue_latency - ea->translation_latency);
 }
 
-void generate_exec_latency_view(CompletionEntry *completions,
+void generate_exec_latency_view(completion_entry *completions,
                                 int completion_count) {
   REPORT_FILE_PATH("exec_lat_view");
   FILE *fp = fopen(filepath, "w");
@@ -538,16 +451,16 @@ void generate_exec_latency_view(CompletionEntry *completions,
           "Avg Exec Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
-  qsort(completions, completion_count, sizeof(CompletionEntry),
+  qsort(completions, completion_count, sizeof(completion_entry),
         compare_exec_latency);
 
   // process completion entries
-  // assuming you have a BinaryInfo struct for each file
+  // assuming you have a binary_info struct for each file
 
   // process completion entries
   for (int i = 0; i < MIN(completion_count, PROCESS_LIMIT); i++) {
-    BinaryInfo *binary_info = load_binary(completions[i].filename);
-    DebugInfo dinfo =
+    binary_info *binary_info = load_binary(completions[i].filename);
+    debug_info_data dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
 
     // get function name
@@ -579,12 +492,12 @@ void generate_exec_latency_view(CompletionEntry *completions,
 
 // comparison function for sorting by execution latency
 int compare_issue_latency(const void *a, const void *b) {
-  const CompletionEntry *ea = (const CompletionEntry *)a;
-  const CompletionEntry *eb = (const CompletionEntry *)b;
+  const completion_entry *ea = (const completion_entry *)a;
+  const completion_entry *eb = (const completion_entry *)b;
   return (eb->issue_latency) - (ea->issue_latency);
 }
 
-void generate_issue_latency_view(CompletionEntry *completions,
+void generate_issue_latency_view(completion_entry *completions,
                                  int completion_count) {
   REPORT_FILE_PATH("issue_lat_view");
   FILE *fp = fopen(filepath, "w");
@@ -599,13 +512,13 @@ void generate_issue_latency_view(CompletionEntry *completions,
       "Avg Issue Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
-  qsort(completions, completion_count, sizeof(CompletionEntry),
+  qsort(completions, completion_count, sizeof(completion_entry),
         compare_issue_latency);
 
   // process completion entries
   for (int i = 0; i < MIN(completion_count, PROCESS_LIMIT); i++) {
-    BinaryInfo *binary_info = load_binary(completions[i].filename);
-    DebugInfo dinfo =
+    binary_info *binary_info = load_binary(completions[i].filename);
+    debug_info_data dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
 
     // get function name
@@ -634,12 +547,12 @@ void generate_issue_latency_view(CompletionEntry *completions,
 
 // comparison function for sorting by execution latency
 int compare_x_latency(const void *a, const void *b) {
-  const CompletionEntry *ea = (const CompletionEntry *)a;
-  const CompletionEntry *eb = (const CompletionEntry *)b;
+  const completion_entry *ea = (const completion_entry *)a;
+  const completion_entry *eb = (const completion_entry *)b;
   return (eb->translation_latency) - (ea->translation_latency);
 }
 
-void generate_x_latency_view(CompletionEntry *completions,
+void generate_x_latency_view(completion_entry *completions,
                              int completion_count) {
   REPORT_FILE_PATH("x_lat_view");
   FILE *fp = fopen(filepath, "w");
@@ -653,13 +566,13 @@ void generate_x_latency_view(CompletionEntry *completions,
           "Avg X Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
-  qsort(completions, completion_count, sizeof(CompletionEntry),
+  qsort(completions, completion_count, sizeof(completion_entry),
         compare_x_latency);
 
   // process completion entries
   for (int i = 0; i < MIN(completion_count, PROCESS_LIMIT); i++) {
-    BinaryInfo *binary_info = load_binary(completions[i].filename);
-    DebugInfo dinfo =
+    binary_info *binary_info = load_binary(completions[i].filename);
+    debug_info_data dinfo =
         *(get_asm(completions[i].filename, completions[i].offset));
 
     // get function name
@@ -688,11 +601,11 @@ void generate_x_latency_view(CompletionEntry *completions,
 
 // comparison function for sorting by execution latency
 int compare_branch(const void *a, const void *b) {
-  const BranchEntry *ea = (const BranchEntry *)a;
-  const BranchEntry *eb = (const BranchEntry *)b;
+  const branch_entry *ea = (const branch_entry *)a;
+  const branch_entry *eb = (const branch_entry *)b;
   return (eb->total_latency) - (ea->total_latency);
 }
-void generate_branch_view(BranchEntry *entries, int count) {
+void generate_branch_view(branch_entry *entries, int count) {
   REPORT_FILE_PATH("branch_view");
   FILE *fp = fopen(filepath, "w");
   if (!fp) {
@@ -704,11 +617,11 @@ void generate_branch_view(BranchEntry *entries, int count) {
   fprintf(fp, "Type,Count,Avg_Total_Lat,Avg_Issue_Lat,Not_Taken,Mispredicted,"
               "Saturated,Location,Line,Function,Assembly\n");
 
-  qsort(entries, count, sizeof(BranchEntry), compare_branch);
+  qsort(entries, count, sizeof(branch_entry), compare_branch);
 
   for (int i = 0; i < MIN(count, PROCESS_LIMIT); i++) {
-    BinaryInfo *binary_info = load_binary(entries[i].filename);
-    DebugInfo dinfo = *(get_asm(entries[i].filename, entries[i].offset));
+    binary_info *binary_info = load_binary(entries[i].filename);
+    debug_info_data dinfo = *(get_asm(entries[i].filename, entries[i].offset));
 
     // get function name
     char *function_name = get_function_name(binary_info, entries[i].offset);
@@ -736,13 +649,13 @@ void generate_branch_view(BranchEntry *entries, int count) {
   fclose(fp);
 }
 
-void generate_completion_view(CompletionEntry *entries, int count) {
+void generate_completion_view(completion_entry *entries, int count) {
   REPORT_FILE_PATH("completion_node_view");
   FILE *fp = fopen(filepath, "w");
   if (!fp)
     return;
 
-  qsort(entries, count, sizeof(CompletionEntry), compare_exec_latency);
+  qsort(entries, count, sizeof(completion_entry), compare_exec_latency);
 
   fprintf(
       fp,
@@ -752,8 +665,8 @@ void generate_completion_view(CompletionEntry *entries, int count) {
       "Location,Line,Function,Assembly\n");
 
   for (int i = 0; i < MIN(count, PROCESS_LIMIT); i++) {
-    BinaryInfo *binary_info = load_binary(entries[i].filename);
-    DebugInfo dinfo = *(get_asm(entries[i].filename, entries[i].offset));
+    binary_info *binary_info = load_binary(entries[i].filename);
+    debug_info_data dinfo = *(get_asm(entries[i].filename, entries[i].offset));
 
     char *function_name = get_function_name(binary_info, entries[i].offset);
 
@@ -820,9 +733,9 @@ void generate_completion_view(CompletionEntry *entries, int count) {
   fclose(fp);
 }
 
-int build_report() {
-  BranchEntry branch_entries[MAX_ENTRIES];
-  CompletionEntry completion_entries[MAX_ENTRIES];
+void build_report() {
+  branch_entry branch_entries[MAX_ENTRIES];
+  completion_entry completion_entries[MAX_ENTRIES];
   int branch_count = 0, completion_count = 0;
 
   const char *report_dir = get_hotline_dir();
@@ -851,6 +764,4 @@ int build_report() {
   generate_x_latency_view(completion_entries, completion_count);
   generate_branch_view(branch_entries, branch_count);
   generate_completion_view(completion_entries, completion_count);
-
-  return 0;
 }
