@@ -18,6 +18,7 @@ size_t global_filename_count = 0;
 struct pid_maps_table *mapping_table;
 struct arm_spe_pmu *pmus;
 struct cpu_session *sessions;
+struct arg_config config;
 
 extern int build_report();
 
@@ -202,9 +203,8 @@ cleanup:
     fclose(branch_fp);
   if (iter)
     btree_iter_free(iter);
-  if (vm_spe_tr)
-    btree_free(vm_spe_tr);
-  free_pid_maps_table(mapping_table);
+
+  cleanup_resources(&config);
 
   if (!success) {
     fprintf(stderr, "commit_to_file failed\n");
@@ -212,7 +212,7 @@ cleanup:
 }
 
 int hotline_main(int argc, char *argv[]) {
-  struct arg_config config = {0};
+  memset(&config, 0, sizeof(struct arg_config));
   struct arm_spe_pmu *pmus = NULL;
   struct cpu_session *sessions = NULL;
 
@@ -262,8 +262,8 @@ int hotline_main(int argc, char *argv[]) {
   // initialize mapping table and read /proc/map to get all currently running
   // processes this is needed as currently running processes do not generate
   // MMAP2 records
-  mapping_table = init_pid_maps();
-  get_initial_mappings(mapping_table);
+  mapping_table = init_pid_maps(&config);
+  get_initial_mappings(mapping_table, &config);
 
   // main event loop
   uint64_t iters = config.timeout / ((double)config.period / 1000);

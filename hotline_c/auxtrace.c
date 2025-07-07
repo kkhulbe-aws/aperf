@@ -56,7 +56,7 @@ uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc) {
 }
 
 void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session,
-                uint64_t target_ts) {
+                uint64_t target_ts, struct arg_config *config) {
   char *data_page = ((char *)pmu->meta_page) + PAGE_SIZE;
   uint64_t data_head = pmu->meta_page->data_head;
   uint64_t data_tail = session->last_record_tail; // use session's last position
@@ -144,7 +144,8 @@ void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session,
 
       os->type = PERF_RECORD_MMAP2;
       handle_mmap2_record(mapping_table,
-                          (struct mmap2_mapping *)&os->sample.mmap2_entry);
+                          (struct mmap2_mapping *)&os->sample.mmap2_entry,
+                          config);
       free(os);
       break;
     }
@@ -205,7 +206,7 @@ void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session,
       parse_record(record, &entry);
 
       // process all records up to this timestamp
-      upgrade_ts(pmu, session, perf_ts);
+      upgrade_ts(pmu, session, perf_ts, config);
 
       // process the aux record itself
       handle_aux_record(session, &entry, config);
@@ -223,7 +224,7 @@ void traverse_buffers(struct arm_spe_pmu *pmu, struct cpu_session *session,
 bool handle_aux_record(struct cpu_session *session, struct aux_entry *entry,
                        struct arg_config *config) {
   pid_t pid = session->pid;
-  struct pid_maps *maps = get_pid_maps(mapping_table, pid);
+  struct pid_maps *maps = get_pid_maps(mapping_table, pid, config);
   char *filename;
   uint64_t file_off;
 

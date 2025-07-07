@@ -257,7 +257,7 @@ extern void traverse_buffers(struct arm_spe_pmu *pmu,
 /// @param session current CPU session
 /// @param ts timestamp to upgrade to
 extern void upgrade_ts(struct arm_spe_pmu *pmu, struct cpu_session *session,
-                       uint64_t ts);
+                       uint64_t ts, struct arg_config *config);
 
 extern struct btree *vm_spe_tr;
 extern struct pid_maps_table *mapping_table;

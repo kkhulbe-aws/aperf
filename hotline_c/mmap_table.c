@@ -1,4 +1,5 @@
 #include "mmap_table.h"
+#include "config.h"
 
 /**
  * General purpose functions to manage the MMAP entries
@@ -21,16 +22,18 @@ size_t add_global_filename(const char *filename) {
   return (size_t)-1;
 }
 
-struct pid_maps_table *init_pid_maps() {
+struct pid_maps_table *init_pid_maps(struct arg_config *config) {
   struct pid_maps_table *table = calloc(1, sizeof(struct pid_maps_table));
   if (!table) {
     rs_wrapper_error("Failed allocation of pid_maps_table. Exiting.\n");
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
   return table;
 }
 
-struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid) {
+struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid,
+                              struct arg_config *config) {
   uint32_t hash = ((uint32_t)pid) % PID_MAP_HASH_SIZE;
   struct pid_maps *maps = table->buckets[hash];
 
@@ -46,6 +49,7 @@ struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid) {
   maps->maps = malloc(maps->capacity * sizeof(struct map_entry));
   if (!maps->maps) {
     rs_wrapper_error("allocating maps for pid %lu failed\n", pid);
+    cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
   maps->next = table->buckets[hash];
@@ -55,8 +59,9 @@ struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid) {
 }
 
 void handle_mmap2_record(struct pid_maps_table *table,
-                         const struct mmap2_mapping *record) {
-  struct pid_maps *maps = get_pid_maps(table, record->pid);
+                         const struct mmap2_mapping *record,
+                         struct arg_config *config) {
+  struct pid_maps *maps = get_pid_maps(table, record->pid, config);
 
   if (maps->count >= maps->capacity) {
     maps->capacity *= 2;
@@ -64,6 +69,7 @@ void handle_mmap2_record(struct pid_maps_table *table,
 
     if (!maps->maps) {
       rs_wrapper_error("reallocating maps failed\n");
+      cleanup_resources(config);
       exit(EXIT_FAILURE);
     }
   }
@@ -137,7 +143,8 @@ void free_pid_maps(struct pid_maps_table *table, pid_t pid) {
   }
 }
 
-void get_initial_mappings(struct pid_maps_table *table) {
+void get_initial_mappings(struct pid_maps_table *table,
+                          struct arg_config *config) {
   DIR *proc_dir;
   struct dirent *pid_entry;
 
@@ -174,7 +181,7 @@ void get_initial_mappings(struct pid_maps_table *table) {
             .pid = pid, .addr = start, .len = end - start, .pgoff = offset};
         record.file_id = add_global_filename(path);
 
-        handle_mmap2_record(table, &record);
+        handle_mmap2_record(table, &record, config);
       }
     }
 

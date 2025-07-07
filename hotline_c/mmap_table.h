@@ -65,7 +65,8 @@ struct __attribute__((packed)) mmap2_mapping {
 /// @brief Sets up, frees, and accesses pid tables
 extern struct pid_maps_table *create_pid_maps_table(void);
 extern void free_pid_maps_table(struct pid_maps_table *table);
-extern struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid);
+extern struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid,
+                                     struct arg_config *config);
 
 /// @brief Adds a new pid entry for a given pid
 /// @param table global PID table to add into
@@ -80,20 +81,22 @@ extern void add_map_entry(struct pid_maps_table *table, pid_t pid,
 extern void remove_pid_maps(struct pid_maps_table *table, pid_t pid);
 
 /// @brief Initializes datastructures
-extern struct pid_maps_table *init_pid_maps(void);
+extern struct pid_maps_table *init_pid_maps(struct arg_config *config);
 
 /// @brief Logic to update the PID table given a new MMAP2 record
 /// @param table Table to update
 /// @param record MMAP2 record, read from the record buffer during
 /// `traverse_buffers`
 extern void handle_mmap2_record(struct pid_maps_table *table,
-                                const struct mmap2_mapping *record);
+                                const struct mmap2_mapping *record,
+                                struct arg_config *config);
 
 /// @brief We are not given MMAP2 records for already running processes. We
 /// figure this out by
 ///        reading /proc/... to get all active processes and map them in.
 /// @param table Table to map into
-extern void get_initial_mappings(struct pid_maps_table *table);
+extern void get_initial_mappings(struct pid_maps_table *table,
+                                 struct arg_config *config);
 
 /// @brief Converts a given progarm counter to a filename and offset
 /// @param maps PID datastructure associated with a PID
