@@ -49,12 +49,9 @@ fn main() -> Result<()> {
     {
     cc::Build::new()
         .files([
-            "hotline_c/main.c",
-            "hotline_c/auxtrace.c",
+            "hotline_c/hotline.c",
             "hotline_c/btree.c",
             "hotline_c/config.c",
-            "hotline_c/vm_spe_btree.c",
-            "hotline_c/mmap_table.c",
             "hotline_c/report.c",
         ])
         .includes(["hotline_c"])

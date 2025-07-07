@@ -293,47 +293,47 @@ void process_completion_file(const char *filename, CompletionEntry *entries,
   fclose(fp);
 }
 
-char* get_line_at_line_number(const char* filename, int target_line) {
-    FILE* file = fopen(filename, "r");
-    if (!file) {
-        perror("Error opening file");
-        return "???\0";
-    }
+char *get_line_at_line_number(const char *filename, int target_line) {
+  FILE *file = fopen(filename, "r");
+  if (!file) {
+    perror("Error opening file");
+    return "???\0";
+  }
 
-    char* line = malloc(MAX_LINE_LENGTH);
-    if (!line) {
-        fclose(file);
-        perror("Memory allocation failed");
-        return NULL;
-    }
-
-    // Read lines until we reach the target line number
-    int current_line = 1;
-    while (current_line < target_line) {
-        if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
-            // Reached EOF before target line
-            fclose(file);
-            free(line);
-            return NULL;
-        }
-        current_line++;
-    }
-
-    // Read the target line
-    if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
-        fclose(file);
-        free(line);
-        return NULL;
-    }
-
-    // Remove newline character if present
-    size_t len = strlen(line);
-    if (len > 0 && line[len-1] == '\n') {
-        line[len-1] = '\0';
-    }
-
+  char *line = malloc(MAX_LINE_LENGTH);
+  if (!line) {
     fclose(file);
-    return line;
+    perror("Memory allocation failed");
+    return NULL;
+  }
+
+  // Read lines until we reach the target line number
+  int current_line = 1;
+  while (current_line < target_line) {
+    if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
+      // Reached EOF before target line
+      fclose(file);
+      free(line);
+      return NULL;
+    }
+    current_line++;
+  }
+
+  // Read the target line
+  if (fgets(line, MAX_LINE_LENGTH, file) == NULL) {
+    fclose(file);
+    free(line);
+    return NULL;
+  }
+
+  // Remove newline character if present
+  size_t len = strlen(line);
+  if (len > 0 && line[len - 1] == '\n') {
+    line[len - 1] = '\0';
+  }
+
+  fclose(file);
+  return line;
 }
 
 void get_source_info(BinaryInfo *info, uint64_t addr, char **filename,
@@ -351,46 +351,72 @@ void get_source_info(BinaryInfo *info, uint64_t addr, char **filename,
   }
 }
 
-char* get_absolute_path(const char* debug_file_path, const char* relative_path) {
-    if (!debug_file_path || !relative_path) {
-        return NULL;
-    }
+char *get_absolute_path(const char *base_path, const char *relative_path) {
+  if (!base_path || !relative_path) {
+    return NULL;
+  }
 
-    char *base_dir = strdup(debug_file_path);
+  // If relative_path is absolute (starts with '/'), just return a copy of it
+  if (relative_path[0] == '/') {
+    return strdup(relative_path);
+  }
+
+  // Get the directory part of base_path
+  const char *last_slash = strrchr(base_path, '/');
+  char *base_dir;
+
+  if (!last_slash) {
+    base_dir = strdup("./");
+  } else {
+    size_t dir_len = last_slash - base_path + 1;
+    base_dir = malloc(dir_len + 1);
     if (!base_dir) {
-        return NULL;
+      return NULL;
     }
+    strncpy(base_dir, base_path, dir_len);
+    base_dir[dir_len] = '\0';
+  }
 
-    char *last_slash = strrchr(base_dir, '/');
-    if (last_slash) {
-        *(last_slash + 1) = '\0';  // Cut off the filename, keep the directory path
-    }
+  if (!base_dir) {
+    return NULL;
+  }
 
-    // Remove any "./" from the beginning of relative_path
-    while (relative_path[0] == '.' && relative_path[1] == '/') {
-        relative_path += 2;
-    }
+  // Remove any "./" from the beginning of relative_path
+  while (relative_path[0] == '.' && relative_path[1] == '/') {
+    relative_path += 2;
+  }
 
-    // Skip leading '/' in relative_path if base_dir ends with '/'
-    while (base_dir[strlen(base_dir) - 1] == '/' && relative_path[0] == '/') {
-        relative_path++;
-    }
-
-    char *full_path = malloc(PATH_MAX);
-    if (!full_path) {
-        free(base_dir);
-        return NULL;
-    }
-
-    if (snprintf(full_path, PATH_MAX, "%s%s", base_dir, relative_path) >= PATH_MAX) {
-        // Path too long
-        free(base_dir);
-        free(full_path);
-        return NULL;
-    }
-    
+  char *full_path = malloc(PATH_MAX);
+  if (!full_path) {
     free(base_dir);
-    return full_path;
+    return NULL;
+  }
+
+  if (snprintf(full_path, PATH_MAX, "%s%s", base_dir, relative_path) >=
+      PATH_MAX) {
+    // Path too long
+    free(base_dir);
+    free(full_path);
+    return NULL;
+  }
+
+  // Clean up any double slashes
+  char *src = full_path;
+  char *dst = full_path;
+  char prev = '\0';
+
+  while (*src) {
+    if (*src == '/' && prev == '/') {
+      src++;
+      continue;
+    }
+    prev = *src;
+    *dst++ = *src++;
+  }
+  *dst = '\0';
+
+  free(base_dir);
+  return full_path;
 }
 
 DebugInfo *get_asm(const char *filename, uint64_t offset) {
@@ -422,17 +448,17 @@ DebugInfo *get_asm(const char *filename, uint64_t offset) {
     char *line_s;
     get_source_info(info, offset, &source_file, &line_number);
     if (source_file) {
-        char *full_path = get_absolute_path(filename, source_file);
-        if (full_path) {
-            snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
-                      full_path, line_number);
-      line_s = get_line_at_line_number(full_path, line_number);
-      free(full_path);
-        } else {
-            snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
-                      source_file, line_number);
-            line_s = "???\0";
-        }
+      char *full_path = get_absolute_path(filename, source_file);
+      if (full_path) {
+        snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
+                 full_path, line_number);
+        line_s = get_line_at_line_number(full_path, line_number);
+        free(full_path);
+      } else {
+        snprintf(location_with_line, sizeof(location_with_line), "%s:%d",
+                 source_file, line_number);
+        line_s = "???\0";
+      }
 
       // get source line
       dinfo->line = line_s;
@@ -490,7 +516,6 @@ char *get_function_name(BinaryInfo *info, uint64_t addr) {
   return NULL;
 }
 
-
 // comparison function for sorting by execution latency
 int compare_exec_latency(const void *a, const void *b) {
   const CompletionEntry *ea = (const CompletionEntry *)a;
@@ -509,7 +534,8 @@ void generate_exec_latency_view(CompletionEntry *completions,
     return;
   }
 
-  fprintf(fp, "Avg Exec Latency,Count,Saturated,Location,Line,Function,Assembly\n");
+  fprintf(fp,
+          "Avg Exec Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
@@ -533,8 +559,8 @@ void generate_exec_latency_view(CompletionEntry *completions,
                      completions[i].translation_latency) /
                 completions[i].retired_insts,
             completions[i].retired_insts, completions[i].saturated,
-            dinfo.source_file_line, dinfo.line, function_name ? function_name : "???",
-            dinfo.assembly);
+            dinfo.source_file_line, dinfo.line,
+            function_name ? function_name : "???", dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
@@ -568,7 +594,9 @@ void generate_issue_latency_view(CompletionEntry *completions,
     return;
   }
 
-  fprintf(fp, "Avg Issue Latency,Count,Saturated,Location,Line,Function,Assembly\n");
+  fprintf(
+      fp,
+      "Avg Issue Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
@@ -587,8 +615,8 @@ void generate_issue_latency_view(CompletionEntry *completions,
             (double)(completions[i].issue_latency) /
                 completions[i].retired_insts,
             completions[i].retired_insts, completions[i].saturated,
-            dinfo.source_file_line, dinfo.line, function_name ? function_name : "???",
-            dinfo.assembly);
+            dinfo.source_file_line, dinfo.line,
+            function_name ? function_name : "???", dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
@@ -621,7 +649,8 @@ void generate_x_latency_view(CompletionEntry *completions,
     return;
   }
 
-  fprintf(fp, "Avg X Latency,Count,Saturated,Location,Line,Function,Assembly\n");
+  fprintf(fp,
+          "Avg X Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
   // sort completions by execution latency
   qsort(completions, completion_count, sizeof(CompletionEntry),
@@ -639,9 +668,9 @@ void generate_x_latency_view(CompletionEntry *completions,
     fprintf(fp, "%.2f,%d,%d,%s,%s,%s,%s\n",
             (double)(completions[i].translation_latency) /
                 completions[i].retired_insts,
-            completions[i].retired_insts, completions[i].saturated, 
-            dinfo.source_file_line, dinfo.line, function_name ? function_name : "???",
-            dinfo.assembly);
+            completions[i].retired_insts, completions[i].saturated,
+            dinfo.source_file_line, dinfo.line,
+            function_name ? function_name : "???", dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
@@ -774,8 +803,8 @@ void generate_completion_view(CompletionEntry *entries, int count) {
             l2_bin_percents[3], l3_percent, l3_bin_percents[0],
             l3_bin_percents[1], l3_bin_percents[2], l3_bin_percents[3],
             dram_percent, dram_bin_percents[0], dram_bin_percents[1],
-            dram_bin_percents[2], dram_bin_percents[3], dinfo.source_file_line, dinfo.line,
-            function_name ? function_name : "???", dinfo.assembly);
+            dram_bin_percents[2], dram_bin_percents[3], dinfo.source_file_line,
+            dinfo.line, function_name ? function_name : "???", dinfo.assembly);
 
     if (!dinfo.source_file_line)
       free(dinfo.source_file_line);
