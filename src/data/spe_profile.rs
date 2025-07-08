@@ -15,8 +15,6 @@ use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::os::raw::c_char;
-use log::error;
-use std::ffi::CStr;
 
 #[cfg(feature = "spe")]
 unsafe extern "C" {
@@ -319,7 +317,7 @@ fn init_spe_profile() {
         ProcessedData::SPEProfile(spe_perf_profile.clone()),
         file_name.clone(),
         js_file_name,
-        include_str!(concat!(env!("JS_DIR"), "/perf_profile.js")).to_string(),
+        include_str!(concat!(env!("JS_DIR"), "/spe_profile.js")).to_string(),
         file_name.clone(),
     );
     dv.has_custom_raw_data_parser();

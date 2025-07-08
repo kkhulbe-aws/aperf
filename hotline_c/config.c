@@ -29,8 +29,8 @@ void parse_arguments(int argc, char *argv[], struct arg_config *config) {
   int option_index = 0;
   int c;
 
-  while ((c = getopt_long(argc, argv, "p:s:t:", long_options,
-                          &option_index)) != -1) {
+  while ((c = getopt_long(argc, argv, "p:s:t:", long_options, &option_index)) !=
+         -1) {
     switch (c) {
     case 'p':
       config->period = atoi(optarg);
@@ -125,8 +125,8 @@ void configure_ARM_SPE_cpu(int cpu, struct arm_spe_pmu *pmu,
   fd = perf_event_open(&attr, -1, cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (fd == -1) {
     fprintf(stderr, "Error opening SPE perf event. Skipping Hotline. Are you "
-                     "on Grv metal with kernel "
-                     "drivers loaded?\n");
+                    "on Grv metal with kernel "
+                    "drivers loaded?\n");
     cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
@@ -207,8 +207,8 @@ extern void configure_software_PMU(struct arm_spe_pmu *pmu,
   fd = perf_event_open(&attr, -1, pmu->cpu, -1, PERF_FLAG_FD_CLOEXEC);
   if (fd == -1) {
     fprintf(stderr, "Error opening SPE perf event. Skipping Hotline. Are you "
-                     "on Grv metal with kernel "
-                     "drivers loaded?\n");
+                    "on Grv metal with kernel "
+                    "drivers loaded?\n");
     cleanup_resources(config);
     exit(EXIT_FAILURE);
   }

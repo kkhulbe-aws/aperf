@@ -565,7 +565,7 @@ void generate_x_latency_view(completion_entry *completions,
   fprintf(fp,
           "Avg X Latency,Count,Saturated,Location,Line,Function,Assembly\n");
 
-  // sort completions by execution latency
+  // sort completions by translation latency
   qsort(completions, completion_count, sizeof(completion_entry),
         compare_x_latency);
 
