@@ -28,7 +28,7 @@ binary_info *load_binary(const char *filename) {
 
   // initialize Capstone
   if (cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &info->cs_handle) != CS_ERR_OK) {
-    rs_wrapper_error("Failed to initialize Capstone\n");
+    fprintf(stderr, "Failed to initialize Capstone\n");
     free(info);
     exit(EXIT_FAILURE);
     return NULL;
@@ -71,7 +71,7 @@ binary_info *load_binary(const char *filename) {
   // get ELF header
   info->ehdr = (Elf64_Ehdr *)info->map;
   if (memcmp(info->ehdr->e_ident, ELFMAG, SELFMAG) != 0) {
-    rs_wrapper_error("Not an ELF file\n");
+    fprintf(stderr, "Not an ELF file\n");
     goto error;
   }
 
@@ -101,7 +101,7 @@ binary_info *load_binary(const char *filename) {
   // initialize DWARF debug info
   info->dwfl = dwfl_begin(&callbacks);
   if (info->dwfl == NULL) {
-    rs_wrapper_error("Failed to initialize DWARF reader\n");
+    fprintf(stderr, "Failed to initialize DWARF reader\n");
     goto error;
   }
 
@@ -112,7 +112,7 @@ binary_info *load_binary(const char *filename) {
   dwfl_report_end(info->dwfl, NULL, NULL);
 
   if (!module) {
-    rs_wrapper_error("Failed to load debug info\n");
+    fprintf(stderr, "Failed to load debug info\n");
     goto error;
   }
 
@@ -740,7 +740,7 @@ void build_report() {
 
   const char *report_dir = get_hotline_dir();
   if (report_dir == NULL) {
-    rs_wrapper_error("Failed to get hotline report directory\n");
+    fprintf(stderr, "Failed to get hotline report directory\n");
     return 1;
   }
 

@@ -90,7 +90,7 @@ void commit_to_file(void) {
   // open load file
   if (snprintf(path, sizeof(path), "%s/%s", get_hotline_dir(),
                "spe_hotline_loads.bin") < 0) {
-    rs_wrapper_error("Error creating load file path\n");
+    fprintf(stderr, "Error creating load file path\n");
     return;
   }
   load_fp = fopen(path, "w");
@@ -98,14 +98,14 @@ void commit_to_file(void) {
   // open branch file
   if (snprintf(path, sizeof(path), "%s/%s", get_hotline_dir(),
                "spe_hotline_branches.bin") < 0) {
-    rs_wrapper_error("Error creating branch file path\n");
+    fprintf(stderr, "Error creating branch file path\n");
     goto cleanup;
   }
   branch_fp = fopen(path, "w");
 
   // verify file handles
   if (!load_fp || !branch_fp) {
-    rs_wrapper_error("Error opening output files\n");
+    fprintf(stderr, "Error opening output files\n");
     goto cleanup;
   }
 
@@ -117,7 +117,7 @@ void commit_to_file(void) {
               "l2_bin1,l2_bin2,l2_bin3,l2_bin4,"
               "l3_bin1,l3_bin2,l3_bin3,l3_bin4,"
               "dram_bin1,dram_bin2,dram_bin3,dram_bin4,saturated\n") < 0) {
-    rs_wrapper_error("Error writing load header\n");
+    fprintf(stderr, "Error writing load header\n");
     goto cleanup;
   }
 
@@ -126,14 +126,14 @@ void commit_to_file(void) {
           "filename,offset,retired_insts,not_taken_branches,"
           "mispredicted,total_latency,issue_latency,saturated,branch_type\n") <
       0) {
-    rs_wrapper_error("Error writing branch header\n");
+    fprintf(stderr, "Error writing branch header\n");
     goto cleanup;
   }
 
   // initialize btree iterator
   iter = btree_iter_new(vm_spe_tr);
   if (!iter) {
-    rs_wrapper_error("Failed to create btree iterator\n");
+    fprintf(stderr, "Failed to create btree iterator\n");
     goto cleanup;
   }
 
@@ -178,7 +178,7 @@ void commit_to_file(void) {
     }
 
     if (write_result < 0) {
-      rs_wrapper_error("Error writing entry to file\n");
+      fprintf(stderr, "Error writing entry to file\n");
       goto cleanup;
     }
   }
@@ -285,7 +285,7 @@ size_t add_global_filename(const char *filename, struct arg_config *config) {
     size_t new_capacity = global_filename_capacity * 2;
     char **new_array = realloc(global_filenames, new_capacity * sizeof(char *));
     if (!new_array) {
-      rs_wrapper_error("Failed re-allocation of global filenames. Exiting.\n");
+      fprintf(stderr, "Failed re-allocation of global filenames. Exiting.\n");
       cleanup_resources(config);
       exit(EXIT_FAILURE);
     }
@@ -296,7 +296,7 @@ size_t add_global_filename(const char *filename, struct arg_config *config) {
   // add new filename
   global_filenames[global_filename_count] = strdup(filename);
   if (!global_filenames[global_filename_count]) {
-    rs_wrapper_error("Failed to update global filenames with file.\n");
+    fprintf(stderr, "Failed to update global filenames with file.\n");
     cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
@@ -309,7 +309,7 @@ size_t add_global_filename(const char *filename, struct arg_config *config) {
 struct pid_maps_table *init_pid_maps(struct arg_config *config) {
   struct pid_maps_table *table = calloc(1, sizeof(struct pid_maps_table));
   if (!table) {
-    rs_wrapper_error("Failed allocation of pid_maps_table. Exiting.\n");
+    fprintf(stderr, "Failed allocation of pid_maps_table. Exiting.\n");
     cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
@@ -335,7 +335,7 @@ struct pid_maps *get_pid_maps(struct pid_maps_table *table, pid_t pid,
   maps->capacity = 16;
   maps->maps = malloc(maps->capacity * sizeof(struct map_entry));
   if (!maps->maps) {
-    rs_wrapper_error("allocating maps for pid failed\n");
+    fprintf(stderr, "allocating maps for pid failed\n");
     cleanup_resources(config);
     exit(EXIT_FAILURE);
   }
@@ -360,7 +360,7 @@ void process_mmap2_record(struct pid_maps_table *table,
     maps->maps = realloc(maps->maps, maps->capacity * sizeof(struct map_entry));
 
     if (!maps->maps) {
-      rs_wrapper_error("reallocating maps failed\n");
+      fprintf(stderr, "reallocating maps failed\n");
       cleanup_resources(config);
       exit(EXIT_FAILURE);
     }
@@ -911,13 +911,13 @@ int hotline_main(int argc, char *argv[]) {
   // allocate PMU and session arrays
   pmus = calloc(config.num_cpu, sizeof(struct arm_spe_pmu));
   if (!pmus) {
-    rs_wrapper_error("Failed to allocate PMU array");
+    fprintf(stderr, "Failed to allocate PMU array");
     return EXIT_FAILURE;
   }
 
   sessions = calloc(config.num_cpu, sizeof(struct cpu_session));
   if (!sessions) {
-    rs_wrapper_error("Failed to allocate session array");
+    fprintf(stderr, "Failed to allocate session array");
     cleanup_resources(&config);
     return EXIT_FAILURE;
   }
@@ -927,7 +927,7 @@ int hotline_main(int argc, char *argv[]) {
   sigemptyset(&sa.sa_mask);
 
   if (sigaction(SIGTERM, &sa, NULL) == -1) {
-    rs_wrapper_error("Cannot handle SIGTERM");
+    fprintf(stderr, "Cannot handle SIGTERM");
     cleanup_resources(&config);
     return EXIT_FAILURE;
   }

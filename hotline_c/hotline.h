@@ -7,7 +7,6 @@
 
 #include "btree.h"
 #include "config.h"
-#include "rs_interface.h"
 
 #define PATH_MAX 512
 
