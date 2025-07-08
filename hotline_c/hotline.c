@@ -518,7 +518,7 @@ void get_initial_mappings(struct pid_maps_table *table,
 void parse_spe_record(struct raw_spe_record *record, struct aux_entry *entry) {
   // parsing logic to get what we want out of the record
 
-  memset(entry, 0, sizeof(entry));
+  memset(entry, 0, sizeof(struct aux_entry));
 
   uint64_t pc;
   memcpy(&pc, &record->pc, 7);
@@ -583,7 +583,8 @@ void process_record_buffer(struct arm_spe_pmu *pmu, struct cpu_session *session,
   char *data_page = ((char *)pmu->meta_page) + PAGE_SIZE;
   uint64_t data_head = pmu->meta_page->data_head;
 
-  // "On SMP-capable platforms, after reading the data_head value, user space should issue an rmb()."
+  // "On SMP-capable platforms, after reading the data_head value, user space
+  // should issue an rmb()."
   // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
   asm volatile("dmb ishld" ::: "memory"); // memory barrier for reading
 
@@ -720,9 +721,9 @@ void process_aux_buffer(struct arm_spe_pmu *pmu, struct cpu_session *session,
   uint64_t aux_size = pmu->meta_page->aux_size;
   uint64_t aux_head = pmu->meta_page->aux_head;
 
-  // "On SMP-capable platforms, after reading the data_head value, user space should issue an rmb()."
-  // The same must be done for the `aux_head`, according to the docs
-  // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+  // "On SMP-capable platforms, after reading the data_head value, user space
+  // should issue an rmb()." The same must be done for the `aux_head`, according
+  // to the docs. https://man7.org/linux/man-pages/man2/perf_event_open.2.html
   asm volatile("dmb ishld" ::: "memory"); // memory barrier for reading
   uint64_t aux_tail = session->last_aux_tail;
 
