@@ -42,10 +42,6 @@ pub struct Record {
     /// SPE sampling frequency, defaulted to 1kHz on Grv4.
     #[clap(long, value_parser, default_value_t = 1000)]
     pub spe_sample_frequency: u32,
-
-    /// Wakeup period to aggregate SPE buffers, provided in ms.
-    #[clap(long, value_parser, default_value_t = 1000)]
-    pub spe_wakeup_period: u32,
 }
 
 fn prepare_data_collectors() -> Result<()> {

@@ -24,23 +24,6 @@ unsafe extern "C" {
     fn build_report();
 }
 
-/*
-This is a rust wrapper for the error! macro. This is so it can be invoked in the
-C functions for consistent error logging.
-*/
-#[no_mangle]
-pub extern "C" fn rs_wrapper_error(error_msg: *const c_char) {
-    let error_str = unsafe {
-        match CStr::from_ptr(error_msg).to_str() {
-            Ok(s) => s,
-            Err(_) => return, // return early if string conversion fails
-        }
-    };
-
-    // call the original error! macro
-    error!("{}", error_str);
-}
-
 pub static SPE_PROFILE_FILE_NAME: &str = "spe_profile";
 
 fn generate_html_tables(

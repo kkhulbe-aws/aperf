@@ -105,8 +105,6 @@ To compare the results of two different performance runs, use the following comm
 ./aperf custom-pmu
 ```
 
-3. This will generate the reports in the specified directory, that can then be downloaded and viewed.
-
 ### Example
 To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 
