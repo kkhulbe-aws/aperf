@@ -38,7 +38,6 @@ typedef struct cpu_system_configuration {
   completion_latency_limits_t latency_limits;
 } cpu_system_configuration_t;
 
-/// @brief Initializes global CPU_SYSTEM_CONFIG struct
 void init_sys_info();
 
 /// @brief Exposed global system configuration for other modules to use

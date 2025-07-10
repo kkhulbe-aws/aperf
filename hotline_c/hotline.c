@@ -16,6 +16,8 @@ uint64_t perf_event_open(struct perf_event_attr *hw_event, pid_t pid, int cpu,
   return ret;
 }
 
+/// @brief Initializes the hardware perf event for the PMU
+/// @param session Active CPU session
 void init_perf_hardware_event(cpu_session_t *session) {
   int fd;
   struct perf_event_attr attr;
@@ -45,6 +47,9 @@ void init_perf_hardware_event(cpu_session_t *session) {
   session->hardware_fd = fd;
 }
 
+/// @brief Initializes the software perf event for the PMU, used for emitting
+/// context switches/MMAP2/exits
+/// @param session Active CPU session
 void init_perf_software_event(cpu_session_t *session) {
   struct perf_event_attr attr;
   int fd;
@@ -79,7 +84,9 @@ void init_perf_software_event(cpu_session_t *session) {
   session->software_fd = fd;
 }
 
-uint64_t mmap_perf_buffers(cpu_session_t *session) {
+/// @brief MMAPs record and aux buffers for the perf events
+/// @param session Active CPU session
+void mmap_perf_buffers(cpu_session_t *session) {
   perf_buffer_size_t buffer_sizes;
   get_perf_buffer_sizes(&buffer_sizes);
 
@@ -118,6 +125,9 @@ void init_perf_events(cpu_session_t *session) {
   ASSERT(ret != -1, "Failed to set software event to non-blocking.");
 }
 
+/// @brief Toggles the PMU to either enable, disable, or reset
+/// @param session Active CPU session
+/// @param toggle Flag to toggle to
 void toggle_pmu(cpu_session_t *session, uint64_t toggle) {
   int ret;
   ret = ioctl(session->hardware_fd, toggle, 0);
@@ -126,6 +136,9 @@ void toggle_pmu(cpu_session_t *session, uint64_t toggle) {
   ASSERT(ret != -1, "Failed to toggle software PMU");
 }
 
+/// @brief Configures the time conversions for the perf event so we can convert
+/// from SPE to perf
+/// @param session Active CPU session
 void configure_session_conv(cpu_session_t *session) {
   session->conv.cap_user_time_short = 1;
   session->conv.cap_user_time_zero = 1;
@@ -136,6 +149,7 @@ void configure_session_conv(cpu_session_t *session) {
   session->conv.time_zero = session->meta_page->time_zero;
 }
 
+/// @brief Initializes all the perf events for each CPU
 void init_sessions() {
   sessions = malloc(sizeof(cpu_session_t) * CPU_SYSTEM_CONFIG.num_cpus);
   memset(sessions, 0, sizeof(cpu_session_t) * CPU_SYSTEM_CONFIG.num_cpus);
@@ -147,6 +161,7 @@ void init_sessions() {
   }
 }
 
+/// @brief Enables perf profiling across all CPUs
 void enable_perf_profiling() {
   for (int i = 0; i < CPU_SYSTEM_CONFIG.num_cpus; i++) {
     toggle_pmu(&sessions[i], PERF_EVENT_IOC_ENABLE);
@@ -171,7 +186,9 @@ uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc) {
          ((rem * tc->time_mult) >> tc->time_shift);
 }
 
-// returns `0` on no event found, and the timestamp of the record.
+/// @brief Given a perf record, gets the timestamp from it. Special care is
+///       required for MMAP2 records. Returns `0` on no event found, and the
+///       timestamp of the record.
 uint64_t get_perf_event_timestamp(struct perf_event_header *header) {
   uint64_t timestamp = 0;
   switch (header->type) {
@@ -213,6 +230,9 @@ uint64_t get_perf_event_timestamp(struct perf_event_header *header) {
   return timestamp;
 }
 
+/// @brief Processes a record for the perf record buffer
+/// @param session Active CPU session
+/// @param header Perf header for the record to process
 void process_record_buffer_record(cpu_session_t *session,
                                   struct perf_event_header *header) {
   switch (header->type) {
@@ -237,8 +257,9 @@ void process_record_buffer_record(cpu_session_t *session,
       struct switch_cpu_wide_record *switch_rec =
           (struct switch_cpu_wide_record *)header;
 
-      if (switch_rec->header.misc & PERF_RECORD_MISC_SWITCH_OUT) {
+      if ((switch_rec->header.misc & PERF_RECORD_MISC_SWITCH_OUT) != 0) {
         session->active_pid = switch_rec->next_prev_pid;
+        // printf("SWITCHED TO PID: %u\n", session->active_pid);
       }
 
       break;
@@ -258,6 +279,9 @@ void process_record_buffer_record(cpu_session_t *session,
   }
 }
 
+/// @brief Process a record for the AUX buffer
+/// @param session Active CPU session
+/// @param record Record to process
 void process_aux_buffer_record(cpu_session_t *session,
                                aux_record_raw_t *record) {
   uint64_t pc;
@@ -267,11 +291,32 @@ void process_aux_buffer_record(cpu_session_t *session,
 
   char *filename;
   uint64_t offset;
+  // printf("HERE\n");
   int res = pc_to_file_offset(pc, session->active_pid, &filename, &offset);
 
-  if (res == 0) printf("mapped to %s:%lu\n", filename, offset);
+  if (res != 0) {
+    // printf("failed mapping\n");
+    return;  // unable to map pc back to file/file offset
+  }
+
+  switch (record->type) {
+    case AUX_PACKET_TYPE_LAT:
+      lat_map_entry_t lat_entry;
+      parse_lat_map_entry(record, &lat_entry, filename, offset);
+      insert_lat_map_entry(&lat_entry);
+      break;
+
+    case AUX_PACKET_TYPE_BRANCH:
+      bmiss_map_entry_t bmiss_entry;
+      parse_bmiss_map_entry(record, &bmiss_entry, filename, offset);
+      insert_bmiss_map(&bmiss_entry);
+      break;
+  }
 }
 
+/// @brief Process all the entries in the record buffer up to the `target_ts`
+/// @param session Active CPU session
+/// @param target_ts Timestamp to go up until
 void process_record_buffer_up_to_ts(cpu_session_t *session,
                                     uint64_t target_ts) {
   char *data_page = session->perf_record_buffer;
@@ -318,6 +363,8 @@ void process_record_buffer_up_to_ts(cpu_session_t *session,
   session->meta_page->data_tail = data_tail;
 }
 
+/// @brief Processes all the aux buffer entries for a CPU session
+/// @param session Active CPU session
 void process_aux_buffer(cpu_session_t *session) {
   void *aux = session->perf_aux_buffer;
   uint64_t aux_size = session->meta_page->aux_size;
@@ -352,4 +399,114 @@ void process_aux_buffer(cpu_session_t *session) {
     session->last_aux_tail = aux_tail;
     session->meta_page->aux_tail = aux_tail;
   }
+}
+
+/// @brief Serializes the LAT_MAP and BMISS_MAP into files
+void serialize_maps() {
+  char path[512];
+  FILE *load_fp = NULL;
+  FILE *branch_fp = NULL;
+  struct btree_iter *iter = NULL;
+  bool success = false;
+  bool ok;
+
+  // open load file
+  int res = snprintf(path, sizeof(path), "%s/%s",
+                     PROFILE_CONFIGURATION.data_dir, "hotline_lat_map.bin");
+  ASSERT(res >= 0, "Failed to create load path.");
+  load_fp = fopen(path, "w");
+
+  // open branch file
+  res = snprintf(path, sizeof(path), "%s/%s", PROFILE_CONFIGURATION.data_dir,
+                 "hotline_bmiss_map.bin");
+  ASSERT(res >= 0, "Failed to create branch path.");
+  branch_fp = fopen(path, "w");
+
+  ASSERT(load_fp != NULL && branch_fp != NULL, "Failed to open output files");
+
+  // write headers
+  res = fprintf(load_fp,
+                "filename,offset,retired_insts,total_latency,issue_latency,"
+                "translation_latency,"
+                "l1_bin1,l1_bin2,l1_bin3,l1_bin4,"
+                "l2_bin1,l2_bin2,l2_bin3,l2_bin4,"
+                "l3_bin1,l3_bin2,l3_bin3,l3_bin4,"
+                "dram_bin1,dram_bin2,dram_bin3,dram_bin4,saturated\n");
+  ASSERT(res >= 0, "Failed to write load header.");
+
+  res = fprintf(
+      branch_fp,
+      "filename,offset,retired_insts,not_taken_branches,"
+      "mispredicted,total_latency,issue_latency,saturated,branch_type\n");
+  ASSERT(res >= 0, "Failed to write branch header.");
+
+  // write load entries
+  iter = btree_iter_new(LAT_MAP);
+  ok = btree_iter_seek(iter, &(lat_map_entry_t){});
+
+  while (ok) {
+    const lat_map_entry_t *entry = btree_iter_item(iter);
+
+    int write_result = fprintf(
+        load_fp,
+        "%s,0x%lx,%lu,%lu,%lu,%lu,"
+        "%lu,%lu,%lu,%lu,"        // l1 bins
+        "%lu,%lu,%lu,%lu,"        // l2 bins
+        "%lu,%lu,%lu,%lu,"        // l3 bins
+        "%lu,%lu,%lu,%lu,%lu\n",  // dram bins
+        entry->filename, entry->offset, entry->retired, entry->total_latency,
+        entry->issue_latency, entry->translation_latency,
+        entry->l1.l1_bound_bin, entry->l1.l2_bound_bin, entry->l1.l3_bound_bin,
+        entry->l1.dram_bound_bin, entry->l2.l1_bound_bin,
+        entry->l2.l2_bound_bin, entry->l2.l3_bound_bin,
+        entry->l2.dram_bound_bin, entry->l3.l1_bound_bin,
+        entry->l3.l2_bound_bin, entry->l3.l3_bound_bin,
+        entry->l3.dram_bound_bin, entry->dram.l1_bound_bin,
+        entry->dram.l2_bound_bin, entry->dram.l3_bound_bin,
+        entry->dram.dram_bound_bin, entry->saturated);
+    ok = btree_iter_next(iter);
+    ASSERT(write_result >= 0, "Failed to write lat entry");
+  }
+
+  // write branch entries
+  iter = btree_iter_new(BMISS_MAP);
+  ok = btree_iter_seek(iter, &(bmiss_map_entry_t){});
+
+  while (ok) {
+    const bmiss_map_entry_t *entry = btree_iter_item(iter);
+
+    int write_result =
+        fprintf(branch_fp, "%s,0x%lx,%lu,%lu,%lu,%lu,%lu,%lu,%x\n",
+                entry->filename, entry->offset, entry->retired,
+                entry->not_taken, entry->mispredicted, entry->total_latency,
+                entry->issue_latency, entry->saturated, entry->branch_type);
+    ASSERT(write_result >= 0, "Failed to write branch entry");
+    ok = btree_iter_next(iter);
+  }
+}
+
+/// @brief Exposed wrapper function that APerf will call
+/// @param argc Standard C like argc
+/// @param argv Standard C like argv
+void hotline(int argc, char *argv[]) {
+  init_sys_info();
+  parse_arguments(argc, argv);
+
+  init_sessions();
+  init_fname_map();
+  init_lat_map();
+  init_bmiss_map();
+
+  int iters =
+      PROFILE_CONFIGURATION.timeout / PROFILE_CONFIGURATION.wakeup_period;
+  enable_perf_profiling();
+
+  for (int i = 0; i < iters; i++) {
+    sleep(PROFILE_CONFIGURATION.wakeup_period);
+    for (int c = 0; c < CPU_SYSTEM_CONFIG.num_cpus; c++) {
+      process_aux_buffer(&sessions[c]);
+    }
+  }
+
+  serialize_maps();
 }

@@ -8,11 +8,11 @@
 #ifndef FNAME_MAP_H_
 #define FNAME_MAP_H_
 
+#include <ctype.h>
 #include <dirent.h>
 #include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
-#include <ctype.h>
 
 #include "btree.h"
 #include "log.h"
@@ -37,25 +37,10 @@ typedef struct filename_entry {
   pid_virtual_map_entry_t **virtual_address_map;  // array of pointers
 } filename_entry_t;
 
-/// @brief Inserts a new MMAP2 record into FNAME_MAP.
-/// @param record Record to insert
+void init_fname_map();
 void insert_fname_entry(mmap2_record_t *record);
-
-/// @brief Removes all virtual offset mappings associated with a PID.
-/// @param pid PID to remove mappings for
 void remove_fname_entry(pid_t pid);
 
-/// @brief Initializes FNAME_MAP data structures
-void init_fname_map();
-
-/// @brief Converts an instruction pointer (program counter) into a filename and
-/// file offset, given
-///        the present active PID for the session.
-/// @param pc PC to convert
-/// @param pid Active PID
-/// @param filename Passed in to populate filename
-/// @param offset Passed in to populate file offset
-/// @return -1 on failure to map, 0 on success
 int pc_to_file_offset(uint64_t pc, pid_t pid, char **filename,
                       uint64_t *offset);
 

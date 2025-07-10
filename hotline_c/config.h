@@ -23,6 +23,8 @@ typedef struct profile_config {
   uint32_t wakeup_period;
   uint32_t spe_sample_frequency;
   uint32_t timeout;
+  char *data_dir;
+  char *report_dir;
 } profile_config_t;
 
 typedef struct perf_buffer_size_t {
@@ -31,15 +33,10 @@ typedef struct perf_buffer_size_t {
   uint64_t perf_aux_off;
 } perf_buffer_size_t;
 
-/// @brief Argument parsing logic for CLI input
 void parse_arguments(int argc, char *argv[]);
 
-/// @brief computes the buffer sizes for the record and aux buffers
-/// and returns it in a packaged struct.
-/// @returns perf record buffer size, aux buffer size, and aux offset
 void get_perf_buffer_sizes(perf_buffer_size_t *buffer_sizes);
 
-/// @brief Exposed profile configuration after argument parsing
 extern profile_config_t PROFILE_CONFIGURATION;
 
 #endif  // CONFIG_H_

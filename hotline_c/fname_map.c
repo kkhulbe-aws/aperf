@@ -4,6 +4,11 @@
 
 struct btree *FNAME_MAP = NULL;
 
+/// @brief B-Tree compare function for FNAME_MAP structs
+/// @param a First entry to compare
+/// @param b Second entry to compare
+/// @param udata Unused
+/// @return 1 if a > b, -1 if a < b, 0 if a = b
 int fname_compare(const void *a, const void *b, void *udata) {
   const filename_entry_t *ua = a;
   const filename_entry_t *ub = b;
@@ -22,23 +27,8 @@ int fname_compare(const void *a, const void *b, void *udata) {
   return 0;
 }
 
-bool fname_iter_pid(const void *item, void *udata) {
-  const filename_entry_t *entry = item;
-  pid_t *pid_to_remove = udata;
-
-  if (entry->pid == *pid_to_remove) {
-    return true;
-  }
-  return false;
-}
-
-void free_virtual_map_entry(void *ptr) {
-  if (ptr) {
-    free(*(void **)ptr);
-  }
-}
-
-// @todo function for gathering initial mapping
+/// @brief Perf does not emit MMAP2 records for already running processes.
+/// We will read through /proc/.../maps and get the virtual address mappings.
 void insert_initial_mappings() {
   DIR *proc_dir;
   struct dirent *pid_entry;
@@ -71,9 +61,9 @@ void insert_initial_mappings() {
       if (path[0]) {
         // artificially create a record so we can reuse our insert_fname_map
         size_t filename_len = strlen(path);
-        size_t total_size = sizeof(mmap2_record_t) + filename_len + 1;   
+        size_t total_size = sizeof(mmap2_record_t) + filename_len + 1;
         mmap2_record_t *record = (mmap2_record_t *)calloc(1, total_size);
-        
+
         record->header.type = PERF_RECORD_MMAP2;
         record->header.size = total_size;
         record->pid = pid;
@@ -90,6 +80,7 @@ void insert_initial_mappings() {
   }
 }
 
+/// @brief Initializes FNAME_MAP data structures
 void init_fname_map() {
   FNAME_MAP = btree_new(sizeof(filename_entry_t), 0, fname_compare, NULL);
   btree_clear(FNAME_MAP);
@@ -97,16 +88,18 @@ void init_fname_map() {
   insert_initial_mappings();
 }
 
+/// @brief Inserts a new MMAP2 record into FNAME_MAP.
+/// @param record Record to insert
 void insert_fname_entry(mmap2_record_t *record) {
-  char *filename = strdup(record->filename);
-
-  filename_entry_t key = {.pid = record->pid, .filename = filename};
+  filename_entry_t key = {.pid = record->pid, .filename = record->filename};
 
   const filename_entry_t *entry = btree_get(FNAME_MAP, &key);
 
   // If the key does not exist (NULL), set up a new key, and allocate a new
   // vector for the MMAP data
   if (entry == NULL) {
+    char *filename = strdup(record->filename);
+
     filename_entry_t new_entry;
     new_entry.pid = record->pid;
     new_entry.filename = filename;
@@ -143,13 +136,17 @@ void free_filename_entry(filename_entry_t *entry_to_remove) {
 
   vector_free(entry_to_remove->virtual_address_map);
   btree_delete(FNAME_MAP, entry_to_remove);
+  free(entry_to_remove->filename);
   free(entry_to_remove);
 }
 
+/// @brief Removes all virtual offset mappings associated with a PID.
+/// @param pid PID to remove mappings for
 void remove_fname_entry(pid_t pid) {
   filename_entry_t **to_remove = vector_create();
 
   struct btree_iter *iter = btree_iter_new(FNAME_MAP);
+  // @todo double check if .pid=pid should be there
   bool ok = btree_iter_seek(iter, &(filename_entry_t){.pid = pid});
 
   // First iterate through the b-tree, starting at the pivot .pid=pid.
@@ -179,24 +176,42 @@ void remove_fname_entry(pid_t pid) {
   vector_free(to_remove);
 }
 
+/// @brief Converts an instruction pointer (program counter) into a filename and
+/// file offset, given
+///        the present active PID for the session.
+/// @param pc PC to convert
+/// @param pid Active PID
+/// @param filename Passed in to populate filename
+/// @param offset Passed in to populate file offset
+/// @return -1 on failure to map, 0 on success
 int pc_to_file_offset(uint64_t pc, pid_t pid, char **filename,
                       uint64_t *offset) {
-  const filename_entry_t *entry =
-      btree_get(FNAME_MAP, &(filename_entry_t){.pid = pid});
-  if (entry == NULL) return -1;
+  struct btree_iter *iter = btree_iter_new(FNAME_MAP);
+  bool ok = btree_iter_seek(iter, &(filename_entry_t){});
 
-  pid_virtual_map_entry_t **vmap = entry->virtual_address_map;
-  uint64_t vmap_size = vector_size(vmap);
+  while (ok) {
+    const filename_entry_t *entry = btree_iter_item(iter);
+    if (entry == NULL || entry->pid != pid) {
+      ok = btree_iter_next(iter);
+      continue;
+    };
 
-  for (size_t i = 0; i < vmap_size; i++) {
-    pid_virtual_map_entry_t *ventry = ((pid_virtual_map_entry_t **)vmap)[i];
-    if (pc >= ventry->start && pc < ventry->end) {
-      *filename = strdup(entry->filename);
-      ASSERT(filename != 0, "Failed to duplicate filename string.");
-      *offset = pc - ventry->start + ventry->pgoff;
+    pid_virtual_map_entry_t **vmap = entry->virtual_address_map;
+    uint64_t vmap_size = vector_size(vmap);
 
-      return 0;
+    for (size_t i = 0; i < vmap_size; i++) {
+      pid_virtual_map_entry_t *ventry = ((pid_virtual_map_entry_t **)vmap)[i];
+
+      if (pc >= ventry->start && pc < ventry->end) {
+        *filename = strdup(entry->filename);
+        ASSERT(filename != 0, "Failed to duplicate filename string.");
+        *offset = pc - ventry->start + ventry->pgoff;
+
+        return 0;
+      }
     }
+
+    ok = btree_iter_next(iter);
   }
 
   return -1;

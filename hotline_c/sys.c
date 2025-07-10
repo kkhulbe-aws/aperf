@@ -2,6 +2,8 @@
 
 cpu_system_configuration_t CPU_SYSTEM_CONFIG;
 
+/// @brief Opens a file descriptor to cpuinfo
+/// @return File Descriptor
 FILE *open_cpu_info() {
   FILE *fp;
   fp = fopen("/proc/cpuinfo", "r");
@@ -9,6 +11,9 @@ FILE *open_cpu_info() {
   return fp;
 }
 
+/// @brief Uses the CPU file descriptor to read in the CPU part, so we can
+/// assign latency bins
+/// @return CPU part
 uint64_t get_cpu_part() {
   FILE *fp = open_cpu_info();
   char line[256];
@@ -27,8 +32,11 @@ uint64_t get_cpu_part() {
   return part;
 }
 
+/// @brief Wrapper for page size to standardize everything
 uint64_t get_page_size() { return getpagesize(); }
 
+/// @brief Gets the frequency of the machine, given the Part Number
+/// @return CPU Frequency
 uint64_t get_frequency() {
   uint64_t part = get_cpu_part();
 
@@ -43,8 +51,12 @@ uint64_t get_frequency() {
   }
 }
 
+/// @brief Wrapper to get num CPUs
 uint64_t get_num_cpus() { return sysconf(_SC_NPROCESSORS_ONLN); }
 
+/// @brief Read the part number to bin latencies, which are later used for
+///        histogramming data.
+/// @param limits Bin to populate
 void get_latency_bins(completion_latency_limits_t *limits) {
   uint64_t part = get_cpu_part();
 
@@ -65,6 +77,7 @@ void get_latency_bins(completion_latency_limits_t *limits) {
   }
 }
 
+/// @brief Initializes global CPU_SYSTEM_CONFIG struct
 void init_sys_info() {
   CPU_SYSTEM_CONFIG.cpu_part = get_cpu_part();
   CPU_SYSTEM_CONFIG.frequency = get_frequency();

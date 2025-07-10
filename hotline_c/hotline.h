@@ -17,8 +17,10 @@
 #include <sys/syscall.h>
 #include <sys/types.h>
 
+#include "bmiss_map.h"
 #include "config.h"
 #include "fname_map.h"
+#include "lat_map.h"
 #include "perf_packets.h"
 #include "sys.h"
 
@@ -64,6 +66,8 @@ typedef struct cpu_session {
 void init_sessions();
 void enable_perf_profiling();
 void process_aux_buffer();
+
+void hotline(int argc, char *argv[]);
 
 extern cpu_session_t *sessions;
 

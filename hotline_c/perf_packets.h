@@ -11,6 +11,24 @@
 #include <stdint.h>
 #include <linux/perf_event.h>
 
+#define AUX_PACKET_TYPE_LAT 0x49
+#define AUX_PACKET_TYPE_BRANCH 0x4a
+#define AUX_RECORD_TYPE_BCOND 0x01
+#define AUX_PACKET_SATURATED 4095
+
+#define AUX_EVENT_RETIRED 1 << 1
+#define AUX_EVENT_BRANCH_NOT_TAKEN 1 << 6
+#define AUX_EVENT_BRANCH_MISS 1 << 6
+
+#define DATA_SOURCE_L1 0b0000
+#define DATA_SOURCE_L2 0b1000
+#define DATA_SOURCE_PEER_CORE 0b1001
+#define DATA_SOURCE_LOCAL_CLUSTER 0b1010
+#define DATA_SOURCE_SYSTEM_CACHE 0b1011
+#define DATA_SOURCE_PEER_CLUSTER 0b1100
+#define DATA_SOURCE_REMOTE 0b1101
+#define DATA_SOURCE_DRAM 0b1110
+
 /// @brief sample_id struct spec from
 /// https://man7.org/linux/man-pages/man2/perf_event_open.2.html
 typedef struct sample_id {
