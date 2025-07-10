@@ -1,25 +1,6 @@
-/**
-The MIT License (MIT)
-
-Copyright (c) 2020 Joshua J Baker
-
-Permission is hereby granted, free of charge, to any person obtaining a copy of
-this software and associated documentation files (the "Software"), to deal in
-the Software without restriction, including without limitation the rights to
-use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of
-the Software, and to permit persons to whom the Software is furnished to do so,
-subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
-FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
-COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER
-IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
-CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
+// Copyright 2020 Joshua J Baker. All rights reserved.
+// Use of this source code is governed by an MIT-style
+// license that can be found in the LICENSE file.
 
 #ifndef BTREE_H
 #define BTREE_H
@@ -43,17 +24,20 @@ struct btree;
 //
 // The btree must be freed with btree_free().
 struct btree *btree_new(size_t elsize, size_t max_items,
-                        int (*compare)(const void *a, const void *b,
-                                       void *udata),
-                        void *udata);
+    int (*compare)(const void *a, const void *b, void *udata),
+    void *udata);
 
 // btree_new_with_allocator returns a new btree using a custom allocator.
 //
 // See btree_new for more information
 struct btree *btree_new_with_allocator(
-    void *(*malloc)(size_t), void *(*realloc)(void *, size_t),
-    void (*free)(void *), size_t elsize, size_t max_items,
-    int (*compare)(const void *a, const void *b, void *udata), void *udata);
+    void *(*malloc)(size_t),
+    void *(*realloc)(void *, size_t),
+    void (*free)(void*),
+    size_t elsize,
+    size_t max_items,
+    int (*compare)(const void *a, const void *b, void *udata),
+    void *udata);
 
 // btree_set_item_callbacks sets the item clone and free callbacks that will be
 // called internally by the btree when items are inserted and removed.
@@ -64,9 +48,8 @@ struct btree *btree_new_with_allocator(
 // The clone function should return true if the clone succeeded or false if the
 // system is out of memory.
 void btree_set_item_callbacks(struct btree *btree,
-                              bool (*clone)(const void *item, void *into,
-                                            void *udata),
-                              void (*free)(const void *item, void *udata));
+    bool (*clone)(const void *item, void *into, void *udata),
+    void (*free)(const void *item, void *udata));
 
 // btree_free removes all items from the btree and frees any allocated memory.
 void btree_free(struct btree *btree);
@@ -155,7 +138,7 @@ const void *btree_get(const struct btree *btree, const void *key);
 // Param iter can return false to stop iteration early.
 // Returns false if the iteration has been stopped early.
 bool btree_ascend(const struct btree *btree, const void *pivot,
-                  bool (*iter)(const void *item, void *udata), void *udata);
+    bool (*iter)(const void *item, void *udata), void *udata);
 
 // btree_descend scans the tree within the range [pivot, first].
 
@@ -166,45 +149,44 @@ bool btree_ascend(const struct btree *btree, const void *pivot,
 // Param iter can return false to stop iteration early.
 // Returns false if the iteration has been stopped early.
 bool btree_descend(const struct btree *btree, const void *pivot,
-                   bool (*iter)(const void *item, void *udata), void *udata);
+    bool (*iter)(const void *item, void *udata), void *udata);
 
 // btree_set_hint is the same as btree_set except that an optional "hint" can
 // be provided which may make the operation quicker when done as a batch or
 // in a userspace context.
 const void *btree_set_hint(struct btree *btree, const void *item,
-                           uint64_t *hint);
+    uint64_t *hint);
 
 // btree_get_hint is the same as btree_get except that an optional "hint" can
 // be provided which may make the operation quicker when done as a batch or
 // in a userspace context.
 const void *btree_get_hint(const struct btree *btree, const void *key,
-                           uint64_t *hint);
+    uint64_t *hint);
 
 // btree_delete_hint is the same as btree_delete except that an optional "hint"
 // can be provided which may make the operation quicker when done as a batch or
 // in a userspace context.
 const void *btree_delete_hint(struct btree *btree, const void *key,
-                              uint64_t *hint);
+    uint64_t *hint);
 
 // btree_ascend_hint is the same as btree_ascend except that an optional
 // "hint" can be provided which may make the operation quicker when done as a
 // batch or in a userspace context.
 bool btree_ascend_hint(const struct btree *btree, const void *pivot,
-                       bool (*iter)(const void *item, void *udata), void *udata,
-                       uint64_t *hint);
+    bool (*iter)(const void *item, void *udata),
+    void *udata, uint64_t *hint);
 
 // btree_descend_hint is the same as btree_descend except that an optional
 // "hint" can be provided which may make the operation quicker when done as a
 // batch or in a userspace context.
 bool btree_descend_hint(const struct btree *btree, const void *pivot,
-                        bool (*iter)(const void *item, void *udata),
-                        void *udata, uint64_t *hint);
+    bool (*iter)(const void *item, void *udata),
+    void *udata, uint64_t *hint);
 
 // btree_set_searcher allows for setting a custom search function.
 void btree_set_searcher(struct btree *btree,
-                        int (*searcher)(const void *items, size_t nitems,
-                                        const void *key, bool *found,
-                                        void *udata));
+    int (*searcher)(const void *items, size_t nitems, const void *key,
+        bool *found, void *udata));
 
 // Loop-based iterator
 struct btree_iter *btree_iter_new(const struct btree *btree);
@@ -216,7 +198,9 @@ bool btree_iter_prev(struct btree_iter *iter);
 bool btree_iter_seek(struct btree_iter *iter, const void *key);
 const void *btree_iter_item(struct btree_iter *iter);
 
+
 // DEPRECATED: use `btree_new_with_allocator`
-void btree_set_allocator(void *(malloc)(size_t), void (*free)(void *));
+void btree_set_allocator(void *(malloc)(size_t), void (*free)(void*));
+
 
 #endif
