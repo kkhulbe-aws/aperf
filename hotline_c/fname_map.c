@@ -10,21 +10,20 @@ struct btree *FNAME_MAP = NULL;
 /// @param udata Unused
 /// @return 1 if a > b, -1 if a < b, 0 if a = b
 int fname_compare(const void *a, const void *b, void *udata) {
-  const filename_entry_t *ua = a;
-  const filename_entry_t *ub = b;
+    const filename_entry_t *ua = a;
+    const filename_entry_t *ub = b;
 
-  if (ua->pid < ub->pid) return -1;
-  if (ua->pid > ub->pid) return 1;
+    if (ua->pid < ub->pid) return -1;
+    if (ua->pid > ub->pid) return 1;
 
-  if (ua->filename != NULL && ub->filename != NULL) {
-    int cmp = strcmp(ua->filename, ub->filename);
-    if (cmp == 0) {
-      // Compare ua->pid if filenames are equivalent
+    // If PIDs are equal, then compare filenames
+    // If either filename is NULL, consider entries equal
+    // This allows searching by just PID
+    if (ua->filename == NULL || ub->filename == NULL) {
+        return 0;
     }
-    return cmp;
-  }
 
-  return 0;
+    return strcmp(ua->filename, ub->filename);
 }
 
 /// @brief Perf does not emit MMAP2 records for already running processes.
@@ -147,7 +146,7 @@ void remove_fname_entry(pid_t pid) {
 
   struct btree_iter *iter = btree_iter_new(FNAME_MAP);
   // @todo double check if .pid=pid should be there
-  bool ok = btree_iter_seek(iter, &(filename_entry_t){.pid = pid});
+  bool ok = btree_iter_seek(iter, &(filename_entry_t){.pid=pid});
 
   // First iterate through the b-tree, starting at the pivot .pid=pid.
   // Add all the file_name_entry_t structs into a vector. There can be
@@ -187,7 +186,7 @@ void remove_fname_entry(pid_t pid) {
 int pc_to_file_offset(uint64_t pc, pid_t pid, char **filename,
                       uint64_t *offset) {
   struct btree_iter *iter = btree_iter_new(FNAME_MAP);
-  bool ok = btree_iter_seek(iter, &(filename_entry_t){});
+  bool ok = btree_iter_seek(iter, &(filename_entry_t){.pid=pid});
 
   while (ok) {
     const filename_entry_t *entry = btree_iter_item(iter);

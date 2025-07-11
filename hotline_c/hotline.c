@@ -47,8 +47,7 @@ void init_perf_hardware_event(cpu_session_t *session) {
   session->hardware_fd = fd;
 }
 
-/// @brief Initializes the software perf event for the PMU, used for emitting
-/// context switches/MMAP2/exits
+/// @brief Initializes the software perf event for the PMU, used for emitting context switches/MMAP2/exits
 /// @param session Active CPU session
 void init_perf_software_event(cpu_session_t *session) {
   struct perf_event_attr attr;
@@ -136,8 +135,7 @@ void toggle_pmu(cpu_session_t *session, uint64_t toggle) {
   ASSERT(ret != -1, "Failed to toggle software PMU");
 }
 
-/// @brief Configures the time conversions for the perf event so we can convert
-/// from SPE to perf
+/// @brief Configures the time conversions for the perf event so we can convert from SPE to perf
 /// @param session Active CPU session
 void configure_session_conv(cpu_session_t *session) {
   session->conv.cap_user_time_short = 1;
@@ -187,8 +185,7 @@ uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc) {
 }
 
 /// @brief Given a perf record, gets the timestamp from it. Special care is
-///       required for MMAP2 records. Returns `0` on no event found, and the
-///       timestamp of the record.
+///       required for MMAP2 records. Returns `0` on no event found, and the timestamp of the record.
 uint64_t get_perf_event_timestamp(struct perf_event_header *header) {
   uint64_t timestamp = 0;
   switch (header->type) {
