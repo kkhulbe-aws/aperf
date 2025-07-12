@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 struct btree *FNAME_MAP = NULL;
+const filename_entry_t *cached_entry[CACHE_DEPTH] = {NULL};
 
 /// @brief B-Tree compare function for FNAME_MAP structs
 /// @param a First entry to compare
@@ -10,20 +11,13 @@ struct btree *FNAME_MAP = NULL;
 /// @param udata Unused
 /// @return 1 if a > b, -1 if a < b, 0 if a = b
 int fname_compare(const void *a, const void *b, void *udata) {
-    const filename_entry_t *ua = a;
-    const filename_entry_t *ub = b;
+  const filename_entry_t *ua = a;
+  const filename_entry_t *ub = b;
 
-    if (ua->pid < ub->pid) return -1;
-    if (ua->pid > ub->pid) return 1;
+  if (ua->pid < ub->pid) return -1;
+  if (ua->pid > ub->pid) return 1;
 
-    // If PIDs are equal, then compare filenames
-    // If either filename is NULL, consider entries equal
-    // This allows searching by just PID
-    if (ua->filename == NULL || ub->filename == NULL) {
-        return 0;
-    }
-
-    return strcmp(ua->filename, ub->filename);
+  return 0;
 }
 
 /// @brief Perf does not emit MMAP2 records for already running processes.
@@ -58,10 +52,12 @@ void insert_initial_mappings() {
              &offset, path);
 
       if (path[0]) {
-        // artificially create a record so we can reuse our insert_fname_map
         size_t filename_len = strlen(path);
         size_t total_size = sizeof(mmap2_record_t) + filename_len + 1;
-        mmap2_record_t *record = (mmap2_record_t *)calloc(1, total_size);
+
+        // Allocate continuous memory for record + filename
+        mmap2_record_t *record = malloc(total_size);
+        memset(record, 0, total_size);
 
         record->header.type = PERF_RECORD_MMAP2;
         record->header.size = total_size;
@@ -70,9 +66,19 @@ void insert_initial_mappings() {
         record->len = end - start;
         record->pgoff = offset;
 
+        // Now copy filename to the space after the record
         memcpy(record->filename, path, filename_len + 1);
 
+        finode_t finode;
+        get_file_info(record->filename, &finode);
+        record->ino = finode.ino;
+        record->maj = finode.maj;
+        record->min = finode.min;
+        record->ino_generation = finode.ino_generation;
+
+        insert_finode_entry(record);
         insert_fname_entry(record);
+
         free(record);
       }
     }
@@ -90,18 +96,15 @@ void init_fname_map() {
 /// @brief Inserts a new MMAP2 record into FNAME_MAP.
 /// @param record Record to insert
 void insert_fname_entry(mmap2_record_t *record) {
-  filename_entry_t key = {.pid = record->pid, .filename = record->filename};
+  filename_entry_t key = {.pid = record->pid};
 
   const filename_entry_t *entry = btree_get(FNAME_MAP, &key);
 
   // If the key does not exist (NULL), set up a new key, and allocate a new
   // vector for the MMAP data
   if (entry == NULL) {
-    char *filename = strdup(record->filename);
-
     filename_entry_t new_entry;
     new_entry.pid = record->pid;
-    new_entry.filename = filename;
 
     new_entry.virtual_address_map = vector_create();
 
@@ -113,12 +116,17 @@ void insert_fname_entry(mmap2_record_t *record) {
 
   entry = btree_get(FNAME_MAP, &key);
   pid_virtual_map_entry_t **virtual_address_map = entry->virtual_address_map;
+  // char *filename = strdup(record->filename);
 
   pid_virtual_map_entry_t *virtual_entry =
       malloc(sizeof(pid_virtual_map_entry_t));
   virtual_entry->start = record->addr;
   virtual_entry->end = record->addr + record->len;
   virtual_entry->pgoff = record->pgoff;
+  virtual_entry->finode.ino = record->ino;
+  virtual_entry->finode.maj = record->maj;
+  virtual_entry->finode.min = record->min;
+  virtual_entry->finode.ino_generation = record->ino_generation;
 
   // Add the value directly to the vector
   vector_add(&entry->virtual_address_map, virtual_entry);
@@ -135,44 +143,47 @@ void free_filename_entry(filename_entry_t *entry_to_remove) {
 
   vector_free(entry_to_remove->virtual_address_map);
   btree_delete(FNAME_MAP, entry_to_remove);
-  free(entry_to_remove->filename);
-  free(entry_to_remove);
+}
+
+/// @brief Returns a cached entry or NULL if it doesn't exist.
+/// @param entry PID to find
+const filename_entry_t *get_filename_cached_entry(pid_t pid) {
+  // if (cached_entry && cached_entry->pid == pid) return cached_entry;
+  for (int i = 0; i < CACHE_DEPTH; i++) {
+    if (cached_entry[i] && cached_entry[i]->pid == pid) return cached_entry[i];
+  }
+  return NULL;
+}
+
+/// @brief Updates the cache with a new entry
+/// @param entry Entry to updated
+void update_filename_cached_entry(const filename_entry_t *entry) {
+  // Shift all entries down, discarding the oldest entry
+  for (int i = CACHE_DEPTH - 1; i > 0; i--) {
+    cached_entry[i] = cached_entry[i - 1];
+  }
+
+  // Put new entry at the front of the cache
+  cached_entry[0] = entry;
+}
+
+void prune_filename_cache(pid_t pid) {
+  for (int i = 0; i < CACHE_DEPTH; i++) {
+    if (cached_entry[i] && cached_entry[i]->pid == pid) {
+      cached_entry[i] = NULL;
+    }
+  }
 }
 
 /// @brief Removes all virtual offset mappings associated with a PID.
 /// @param pid PID to remove mappings for
 void remove_fname_entry(pid_t pid) {
-  filename_entry_t **to_remove = vector_create();
-
-  struct btree_iter *iter = btree_iter_new(FNAME_MAP);
-  // @todo double check if .pid=pid should be there
-  bool ok = btree_iter_seek(iter, &(filename_entry_t){.pid=pid});
-
-  // First iterate through the b-tree, starting at the pivot .pid=pid.
-  // Add all the file_name_entry_t structs into a vector. There can be
-  // multiple as a binary can involve multiple files.
-  while (ok) {
-    filename_entry_t *entry = (filename_entry_t *)btree_iter_item(iter);
-
-    if (entry->pid == pid) {
-      filename_entry_t *copied = malloc(sizeof(filename_entry_t));
-      memcpy(copied, entry, sizeof(filename_entry_t));
-      vector_add(&to_remove, copied);
-    }
-
-    ok = btree_iter_next(iter);
+  filename_entry_t *entry =
+      (filename_entry_t *)btree_get(FNAME_MAP, &(filename_entry_t){.pid = pid});
+  if (entry != NULL) {
+    free_filename_entry(entry);
+    prune_filename_cache(pid);
   }
-
-  // Then iterate through the vector we created in the previous step, and
-  // free everything.
-  uint64_t size = vector_size(to_remove);
-
-  for (size_t i = 0; i < size; i++) {
-    filename_entry_t *entry_to_remove = ((filename_entry_t **)to_remove)[i];
-    free_filename_entry(entry_to_remove);
-  }
-
-  vector_free(to_remove);
 }
 
 /// @brief Converts an instruction pointer (program counter) into a filename and
@@ -183,34 +194,32 @@ void remove_fname_entry(pid_t pid) {
 /// @param filename Passed in to populate filename
 /// @param offset Passed in to populate file offset
 /// @return -1 on failure to map, 0 on success
-int pc_to_file_offset(uint64_t pc, pid_t pid, char **filename,
+int va_to_file_offset(uint64_t pc, pid_t pid, finode_t *finode,
                       uint64_t *offset) {
-  struct btree_iter *iter = btree_iter_new(FNAME_MAP);
-  bool ok = btree_iter_seek(iter, &(filename_entry_t){.pid=pid});
+  const filename_entry_t *entry = get_filename_cached_entry(pid);
+  if (entry == NULL)
+    entry = btree_get(FNAME_MAP, &(filename_entry_t){.pid = pid});
 
-  while (ok) {
-    const filename_entry_t *entry = btree_iter_item(iter);
-    if (entry == NULL || entry->pid != pid) {
-      ok = btree_iter_next(iter);
-      continue;
-    };
+  if (entry == NULL || entry->pid != pid) return -1;
 
-    pid_virtual_map_entry_t **vmap = entry->virtual_address_map;
-    uint64_t vmap_size = vector_size(vmap);
+  update_filename_cached_entry(entry);
 
-    for (size_t i = 0; i < vmap_size; i++) {
-      pid_virtual_map_entry_t *ventry = ((pid_virtual_map_entry_t **)vmap)[i];
+  pid_virtual_map_entry_t **vmap = entry->virtual_address_map;
+  uint64_t vmap_size = vector_size(vmap);
 
-      if (pc >= ventry->start && pc < ventry->end) {
-        *filename = strdup(entry->filename);
-        ASSERT(filename != 0, "Failed to duplicate filename string.");
-        *offset = pc - ventry->start + ventry->pgoff;
+  for (size_t i = 0; i < vmap_size; i++) {
+    pid_virtual_map_entry_t *ventry = ((pid_virtual_map_entry_t **)vmap)[i];
 
-        return 0;
-      }
+    if (pc >= ventry->start && pc < ventry->end) {
+      finode->ino = ventry->finode.ino;
+      finode->maj = ventry->finode.maj;
+      finode->min = ventry->finode.min;
+      finode->ino_generation = ventry->finode.ino_generation;
+
+      *offset = pc - ventry->start + ventry->pgoff;
+
+      return 0;
     }
-
-    ok = btree_iter_next(iter);
   }
 
   return -1;

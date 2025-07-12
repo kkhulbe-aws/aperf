@@ -86,3 +86,30 @@ void init_sys_info() {
 
   get_latency_bins(&CPU_SYSTEM_CONFIG.latency_limits);
 }
+
+void get_file_info(const char *filename, finode_t *finode) {
+  // Handle special cases
+  if (strncmp(filename, "anon_inode:", 11) == 0 || filename[0] == '[') {
+    finode->ino = 0;
+    finode->maj = 0;
+    finode->min = 0;
+    finode->ino_generation = 0;
+    return;
+  }
+
+  struct stat sb;
+  if (lstat(filename, &sb) == -1) {
+    finode->ino = 0;
+    finode->maj = 0;
+    finode->min = 0;
+    finode->ino_generation = 0;
+    return;
+  }
+
+  // General case
+  finode->ino = sb.st_ino;
+  dev_t dev = sb.st_dev;  // device containing the file
+  finode->maj = major(dev);
+  finode->min = minor(dev);
+  finode->ino_generation = 0;
+}

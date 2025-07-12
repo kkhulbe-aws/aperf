@@ -47,7 +47,8 @@ void init_perf_hardware_event(cpu_session_t *session) {
   session->hardware_fd = fd;
 }
 
-/// @brief Initializes the software perf event for the PMU, used for emitting context switches/MMAP2/exits
+/// @brief Initializes the software perf event for the PMU, used for emitting
+/// context switches/MMAP2/exits
 /// @param session Active CPU session
 void init_perf_software_event(cpu_session_t *session) {
   struct perf_event_attr attr;
@@ -135,7 +136,8 @@ void toggle_pmu(cpu_session_t *session, uint64_t toggle) {
   ASSERT(ret != -1, "Failed to toggle software PMU");
 }
 
-/// @brief Configures the time conversions for the perf event so we can convert from SPE to perf
+/// @brief Configures the time conversions for the perf event so we can convert
+/// from SPE to perf
 /// @param session Active CPU session
 void configure_session_conv(cpu_session_t *session) {
   session->conv.cap_user_time_short = 1;
@@ -185,7 +187,8 @@ uint64_t tsc_to_perf_time(uint64_t cyc, struct perf_tsc_conversion *tc) {
 }
 
 /// @brief Given a perf record, gets the timestamp from it. Special care is
-///       required for MMAP2 records. Returns `0` on no event found, and the timestamp of the record.
+///       required for MMAP2 records. Returns `0` on no event found, and the
+///       timestamp of the record.
 uint64_t get_perf_event_timestamp(struct perf_event_header *header) {
   uint64_t timestamp = 0;
   switch (header->type) {
@@ -230,35 +233,17 @@ uint64_t get_perf_event_timestamp(struct perf_event_header *header) {
 /// @brief Processes a record for the perf record buffer
 /// @param session Active CPU session
 /// @param header Perf header for the record to process
-void process_record_buffer_record(cpu_session_t *session,
-                                  struct perf_event_header *header) {
+static inline void process_record_buffer_record(
+    cpu_session_t *session, struct perf_event_header *header,
+    uint64_t last_tail) {
   switch (header->type) {
     case PERF_RECORD_MMAP2: {
       struct mmap2_record *mmap2_rec = (struct mmap2_record *)header;
-      size_t fixed_size = offsetof(struct mmap2_record, filename);
-      size_t filename_len =
-          header->size - fixed_size - sizeof(struct sample_id);
-
-      char filename[filename_len + 1];
-      memcpy(filename, ((char *)mmap2_rec) + fixed_size, filename_len);
-      filename[filename_len] = '\0';
 
       // logic to update fname_map
+      insert_finode_entry(
+          mmap2_rec);  // add mapping to inodes for decoding later
       insert_fname_entry(mmap2_rec);
-      break;
-    }
-
-    // if the switch is a SWITCH_OUT, the next_prev_pid is the process
-    // that we are switching into.
-    case PERF_RECORD_SWITCH_CPU_WIDE: {
-      struct switch_cpu_wide_record *switch_rec =
-          (struct switch_cpu_wide_record *)header;
-
-      if ((switch_rec->header.misc & PERF_RECORD_MISC_SWITCH_OUT) != 0) {
-        session->active_pid = switch_rec->next_prev_pid;
-        // printf("SWITCHED TO PID: %u\n", session->active_pid);
-      }
-
       break;
     }
 
@@ -286,26 +271,24 @@ void process_aux_buffer_record(cpu_session_t *session,
   pc = pc & 0x00FFFFFFFFFFFFFF;  // zero out the top byte because
                                  // SPE PC is 7 bytes
 
-  char *filename;
   uint64_t offset;
-  // printf("HERE\n");
-  int res = pc_to_file_offset(pc, session->active_pid, &filename, &offset);
+  finode_t finode;
+  int res = va_to_file_offset(pc, session->active_pid, &finode, &offset);
 
   if (res != 0) {
-    // printf("failed mapping\n");
     return;  // unable to map pc back to file/file offset
   }
 
   switch (record->type) {
     case AUX_PACKET_TYPE_LAT:
-      lat_map_entry_t lat_entry;
-      parse_lat_map_entry(record, &lat_entry, filename, offset);
+      lat_map_entry_t lat_entry = {0};
+      parse_lat_map_entry(record, &lat_entry, &finode, offset);
       insert_lat_map_entry(&lat_entry);
       break;
 
     case AUX_PACKET_TYPE_BRANCH:
-      bmiss_map_entry_t bmiss_entry;
-      parse_bmiss_map_entry(record, &bmiss_entry, filename, offset);
+      bmiss_map_entry_t bmiss_entry = {0};
+      parse_bmiss_map_entry(record, &bmiss_entry, &finode, offset);
       insert_bmiss_map(&bmiss_entry);
       break;
   }
@@ -349,7 +332,16 @@ void process_record_buffer_up_to_ts(cpu_session_t *session,
       last_ts = record_ts;  // update the last processed timestamp
     }
 
-    process_record_buffer_record(session, header);
+    if (header->type == PERF_RECORD_SWITCH_CPU_WIDE) {
+      struct switch_cpu_wide_record *switch_rec =
+          (struct switch_cpu_wide_record *)header;
+      session->active_pid =
+          switch_rec->header.misc & PERF_RECORD_MISC_SWITCH_OUT
+              ? switch_rec->next_prev_pid
+              : session->active_pid;
+    } else {
+      process_record_buffer_record(session, header, data_tail);
+    }
 
     data_tail += header->size;
   }
@@ -400,6 +392,7 @@ void process_aux_buffer(cpu_session_t *session) {
 
 /// @brief Serializes the LAT_MAP and BMISS_MAP into files
 void serialize_maps() {
+  printf("SERIALIZING\n");
   char path[512];
   FILE *load_fp = NULL;
   FILE *branch_fp = NULL;
@@ -443,6 +436,11 @@ void serialize_maps() {
 
   while (ok) {
     const lat_map_entry_t *entry = btree_iter_item(iter);
+    finode_map_entry_t key = {0};
+    key.finode = entry->finode;
+    const finode_map_entry_t *finode_entry = btree_get(FINODE_MAP, &key);
+
+    ASSERT(finode_entry != NULL, "Failed to recover filename.");
 
     int write_result = fprintf(
         load_fp,
@@ -451,8 +449,8 @@ void serialize_maps() {
         "%lu,%lu,%lu,%lu,"        // l2 bins
         "%lu,%lu,%lu,%lu,"        // l3 bins
         "%lu,%lu,%lu,%lu,%lu\n",  // dram bins
-        entry->filename, entry->offset, entry->retired, entry->total_latency,
-        entry->issue_latency, entry->translation_latency,
+        finode_entry->filename, entry->offset, entry->retired,
+        entry->total_latency, entry->issue_latency, entry->translation_latency,
         entry->l1.l1_bound_bin, entry->l1.l2_bound_bin, entry->l1.l3_bound_bin,
         entry->l1.dram_bound_bin, entry->l2.l1_bound_bin,
         entry->l2.l2_bound_bin, entry->l2.l3_bound_bin,
@@ -471,10 +469,15 @@ void serialize_maps() {
 
   while (ok) {
     const bmiss_map_entry_t *entry = btree_iter_item(iter);
+    finode_map_entry_t key = {0};
+    key.finode = entry->finode;
+    const finode_map_entry_t *finode_entry = btree_get(FINODE_MAP, &key);
+
+    ASSERT(finode_entry != NULL, "Failed to recover filename.");
 
     int write_result =
         fprintf(branch_fp, "%s,0x%lx,%lu,%lu,%lu,%lu,%lu,%lu,%x\n",
-                entry->filename, entry->offset, entry->retired,
+                finode_entry->filename, entry->offset, entry->retired,
                 entry->not_taken, entry->mispredicted, entry->total_latency,
                 entry->issue_latency, entry->saturated, entry->branch_type);
     ASSERT(write_result >= 0, "Failed to write branch entry");
@@ -490,6 +493,7 @@ void hotline(int argc, char *argv[]) {
   parse_arguments(argc, argv);
 
   init_sessions();
+  init_finode_map();
   init_fname_map();
   init_lat_map();
   init_bmiss_map();

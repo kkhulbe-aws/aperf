@@ -12,6 +12,7 @@
 #include <string.h>
 
 #include "btree.h"
+#include "finode_map.h"
 #include "log.h"
 #include "perf_packets.h"
 #include "sys.h"
@@ -36,20 +37,20 @@ typedef struct completion_histogram {
 } completion_histogram_t;
 
 typedef struct lat_map_entry {
-  char *filename;
+  finode_t finode;
   uint64_t offset;
   uint64_t total_latency;
   uint64_t issue_latency;
   uint64_t translation_latency;
   uint64_t saturated;
   uint64_t retired;
-  completion_histogram_t l1, l2, l3, dram;
+  completion_histogram_t l1, l2, l3, dram;  // @todo: change to an array
 } lat_map_entry_t;
 
 void init_lat_map();
 void insert_lat_map_entry(lat_map_entry_t *entry);
 void parse_lat_map_entry(aux_record_raw_t *record, lat_map_entry_t *entry,
-                         char *filename, uint64_t offset);
+                         finode_t *finode, uint64_t offset);
 
 extern struct btree *LAT_MAP;
 #endif  // LAT_MAP_H_

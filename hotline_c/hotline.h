@@ -19,6 +19,7 @@
 
 #include "bmiss_map.h"
 #include "config.h"
+#include "finode_map.h"
 #include "fname_map.h"
 #include "lat_map.h"
 #include "perf_packets.h"
@@ -57,6 +58,7 @@ typedef struct cpu_session {
   void *perf_aux_buffer;
 
   pid_t active_pid;
+  uint64_t last_ctx_tail;
 
   // used for traversing buffers and updating B-Trees
   uint64_t last_aux_tail, last_record_tail;

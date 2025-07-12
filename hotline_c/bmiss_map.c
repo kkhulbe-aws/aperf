@@ -10,10 +10,25 @@ struct btree *BMISS_MAP = NULL;
 int bmiss_map_compare(const void *a, const void *b, void *udata) {
   const bmiss_map_entry_t *ua = a;
   const bmiss_map_entry_t *ub = b;
-  if (ua->filename != NULL && ub->filename != NULL) {
-    int cmp = strcmp(ua->filename, ub->filename);
-    if (cmp != 0) return cmp;
-  }
+  if (ua->finode.ino > ub->finode.ino)
+    return 1;
+  else if (ua->finode.ino < ub->finode.ino)
+    return -1;
+
+  if (ua->finode.maj > ub->finode.maj)
+    return 1;
+  else if (ua->finode.maj < ub->finode.maj)
+    return -1;
+
+  if (ua->finode.min > ub->finode.min)
+    return 1;
+  else if (ua->finode.min < ub->finode.min)
+    return -1;
+
+  if (ua->finode.ino_generation > ub->finode.ino_generation)
+    return 1;
+  else if (ua->finode.ino_generation < ub->finode.ino_generation)
+    return -1;
 
   if (ua->offset < ub->offset) return -1;
   if (ua->offset > ub->offset) return 1;
@@ -30,15 +45,14 @@ void init_bmiss_map() {
 /// @brief Inserts a bmiss_map_entry_t into the BMISS_MAP
 /// @param entry_to_insert Entry to insert
 void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
-  bmiss_map_entry_t key = {.filename = entry_to_insert->filename,
+  bmiss_map_entry_t key = {.finode = entry_to_insert->finode,
                            .offset = entry_to_insert->offset};
 
   const bmiss_map_entry_t *entry = btree_get(BMISS_MAP, &key);
 
   if (entry == NULL) {
-    char *filename = strdup(entry_to_insert->filename);
     bmiss_map_entry_t new_entry = {0};
-    new_entry.filename = filename;
+    new_entry.finode = entry_to_insert->finode;
     new_entry.offset = entry_to_insert->offset;
     btree_set(BMISS_MAP, &new_entry);
   }
@@ -46,7 +60,7 @@ void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
   entry = btree_get(BMISS_MAP, &key);
   bmiss_map_entry_t updated_entry = {0};
 
-  updated_entry.filename = entry->filename;
+  updated_entry.finode = entry->finode;
   updated_entry.offset = entry->offset;
 
   updated_entry.total_latency =
@@ -71,11 +85,13 @@ void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
 /// @param offset offset to assign into the entry, decoded from
 /// `pc_to_file_offset`
 void parse_bmiss_map_entry(aux_record_raw_t *record, bmiss_map_entry_t *entry,
-                           char *filename, uint64_t offset) {
-  memset(entry, 0, sizeof(bmiss_map_entry_t));
+                          finode_t *finode, uint64_t offset) {
   entry->saturated = (record->issue_lat == AUX_PACKET_SATURATED) ? 1 : 0;
   entry->retired = (record->events_packet & AUX_EVENT_RETIRED) ? 1 : 0;
-  entry->filename = strdup(filename);
+  entry->finode.ino = finode->ino;
+  entry->finode.maj = finode->maj;
+  entry->finode.min = finode->min;
+  entry->finode.ino_generation = finode->ino_generation;
   entry->offset = offset;
 
   // don't update statistics if saturated

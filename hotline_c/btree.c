@@ -107,7 +107,7 @@ void btree_set_searcher(struct btree *btree,
     btree->searcher = searcher;
 }
 
-#define BTREE_NSPARES 4
+#define BTREE_NSPARES 512
 #define BTREE_SPARE_RETURN btree_spare_at(btree, 0) // returned values
 #define BTREE_SPARE_NODE   btree_spare_at(btree, 1) // clone in btree_node_copy
 #define BTREE_SPARE_POPMAX btree_spare_at(btree, 2) // btree_delete popmax
