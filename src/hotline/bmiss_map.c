@@ -85,7 +85,7 @@ void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
 /// @param offset offset to assign into the entry, decoded from
 /// `pc_to_file_offset`
 void parse_bmiss_map_entry(aux_record_raw_t *record, bmiss_map_entry_t *entry,
-                          finode_t *finode, uint64_t offset) {
+                           finode_t *finode, uint64_t offset) {
   entry->saturated = (record->issue_lat == AUX_PACKET_SATURATED) ? 1 : 0;
   entry->retired = (record->events_packet & AUX_EVENT_RETIRED) ? 1 : 0;
   entry->finode.ino = finode->ino;

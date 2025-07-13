@@ -401,14 +401,15 @@ void serialize_maps() {
   bool ok;
 
   // open load file
-  int res = snprintf(path, sizeof(path), "%s/%s",
-                     PROFILE_CONFIGURATION.data_dir, "hotline_lat_map.bin");
+  int res =
+      snprintf(path, sizeof(path), "%s/%s", PROFILE_CONFIGURATION.data_dir,
+               PROFILE_CONFIGURATION.lat_map_filename);
   ASSERT(res >= 0, "Failed to create load path.");
   load_fp = fopen(path, "w");
 
   // open branch file
   res = snprintf(path, sizeof(path), "%s/%s", PROFILE_CONFIGURATION.data_dir,
-                 "hotline_bmiss_map.bin");
+                 PROFILE_CONFIGURATION.bmiss_map_filename);
   ASSERT(res >= 0, "Failed to create branch path.");
   branch_fp = fopen(path, "w");
 

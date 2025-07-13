@@ -33,8 +33,9 @@ void insert_initial_mappings() {
     if (!isdigit(pid_entry->d_name[0])) continue;
 
     char maps_path[256];
-    snprintf(maps_path, sizeof(maps_path), "/proc/%.230s/maps",
+    int res = snprintf(maps_path, sizeof(maps_path), "/proc/%.230s/maps",
              pid_entry->d_name);
+    ASSERT(res > 0, "snprintf failed.");
 
     FILE *maps = fopen(maps_path, "r");
     if (maps == NULL) continue;

@@ -37,7 +37,11 @@ typedef struct completion_histogram {
 } completion_histogram_t;
 
 typedef struct lat_map_entry {
-  finode_t finode;
+  union {  // union allows data storing and report generation to use the same
+           // parameters rather than having to redefine them each time.
+    finode_t finode;
+    char *filename;
+  };
   uint64_t offset;
   uint64_t total_latency;
   uint64_t issue_latency;

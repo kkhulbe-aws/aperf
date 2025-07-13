@@ -18,8 +18,8 @@ use std::os::raw::c_char;
 
 #[cfg(feature = "spe")]
 unsafe extern "C" {
-    fn hotline_main(argc: c_int, argv: *const *const i8) -> c_int;
-    fn build_report();
+    fn hotline(argc: c_int, argv: *const *const i8) -> c_int;
+    fn deserialize_maps(argc: c_int, argv: *const *const i8) -> c_int;
 }
 
 pub static SPE_PROFILE_FILE_NAME: &str = "spe_profile";
@@ -177,19 +177,18 @@ impl CollectData for SPEProfileRaw {
         {
             let args = vec![
                 CString::new("hotline").unwrap(),
-                CString::new("--period").unwrap(),
+                CString::new("--wakeup_period").unwrap(),
                 CString::new(params.interval.to_string()).unwrap(),
                 CString::new("--spe_sample_frequency").unwrap(),
                 CString::new(params.spe_sample_frequency.to_string()).unwrap(),
                 CString::new("--timeout").unwrap(),
                 CString::new((params.collection_time - 1).to_string()).unwrap(),
+                CString::new("--data_dir").unwrap(),
+                CString::new(params.data_dir.to_str().unwrap()).unwrap(),
             ];
 
-            let argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
 
-            unsafe {
-                env::set_var("HOTLINE_DIR", params.data_dir.clone());
-            }
+            let argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
 
             unsafe {
                 // fork the process
@@ -205,7 +204,7 @@ impl CollectData for SPEProfileRaw {
                             _exit(1);
                         }
                         let result =
-                            hotline_main(args.len() as c_int, argv.as_ptr() as *const *const i8);
+                            hotline(args.len() as c_int, argv.as_ptr() as *const *const i8);
                         _exit(result);
                     }
                     pid => {
@@ -259,29 +258,33 @@ impl GetData for SPEProfile {
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
         #[cfg(feature = "spe")]
         {
-            unsafe {
-                env::set_var("HOTLINE_DIR", params.data_dir.clone());
-            }
+            let args = vec![
+                CString::new("hotline").unwrap(),
+                CString::new("--data_dir").unwrap(),
+                CString::new(params.data_dir.to_str().unwrap()).unwrap(),
+                CString::new("--report_dir").unwrap(),
+                CString::new(format!("{}/data",params.report_dir.to_str().unwrap())).unwrap(),
+            ];
+
+            // Make sure to include null terminator for C
+            let mut argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
+            argv.push(std::ptr::null());
 
             unsafe {
-                env::set_var("HOTLINE_REPORT_DIR", params.report_dir.clone());
-            }
-
-            unsafe {
-                build_report(); // writes csvs to ./data/
+                deserialize_maps((argv.len() - 1) as c_int, argv.as_ptr() as *mut *const i8);
             }
         }
 
         let _ = generate_html_tables(
             &params,
             &format!(
-                "{}/data/completion_node_view.csv",
+                "{}/data/hotline_lat_map_exec_report.csv",
                 params.report_dir.display()
             ),
-            &format!("{}/data/exec_lat_view.csv", params.report_dir.display()),
-            &format!("{}/data/issue_lat_view.csv", params.report_dir.display()),
-            &format!("{}/data/x_lat_view.csv", params.report_dir.display()),
-            &format!("{}/data/branch_view.csv", params.report_dir.display()),
+            &format!("{}/data/hotline_lat_map_exec_report.csv", params.report_dir.display()),
+            &format!("{}/data/hotline_lat_map_issue_report.csv", params.report_dir.display()),
+            &format!("{}/data/hotline_lat_map_translation_report.csv", params.report_dir.display()),
+            &format!("{}/data/hotline_bmiss_map.csv", params.report_dir.display()),
         );
 
         Ok(vec![])

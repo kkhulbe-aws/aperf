@@ -5,7 +5,7 @@ use std::process::Command;
 fn main() -> Result<()> {
     let _ = vergen::EmitBuilder::builder().git_sha(true).emit();
 
-    println!("cargo:rerun-if-changed=hotline_c/*");
+    println!("cargo:rerun-if-changed=src/hotline/*");
     println!("cargo:rerun-if-changed=package.json");
     println!("cargo:rerun-if-changed=package-lock.json");
     println!("cargo:rustc-link-search=native=/usr/lib");
@@ -49,12 +49,19 @@ fn main() -> Result<()> {
     {
     cc::Build::new()
         .files([
-            "hotline_c/hotline.c",
-            "hotline_c/btree.c",
-            "hotline_c/config.c",
-            "hotline_c/report.c",
+            "src/hotline/bmiss_map.c",
+            "src/hotline/btree.c",
+            "src/hotline/config.c",
+            "src/hotline/finode_map.c",
+            "src/hotline/fname_binary_map.c",
+            "src/hotline/fname_map.c",
+            "src/hotline/hotline.c",
+            "src/hotline/lat_map.c",
+            "src/hotline/report.c",
+            "src/hotline/sys.c",
+            "src/hotline/vec.c",
         ])
-        .includes(["hotline_c"])
+        .includes(["src/hotline"])
         .static_flag(true)
         .flag("-w")
         .opt_level(2)

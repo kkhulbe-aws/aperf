@@ -25,6 +25,8 @@ typedef struct profile_config {
   uint32_t timeout;
   char *data_dir;
   char *report_dir;
+  char *bmiss_map_filename;
+  char *lat_map_filename;
 } profile_config_t;
 
 typedef struct perf_buffer_size_t {

@@ -25,6 +25,9 @@ void parse_arguments(int argc, char *argv[]) {
   PROFILE_CONFIGURATION.report_dir =
       strdup("./report");  // default report directory
 
+  PROFILE_CONFIGURATION.bmiss_map_filename = "hotline_bmiss_map.csv";
+  PROFILE_CONFIGURATION.lat_map_filename = "hotline_lat_map.csv";
+
   while ((c = getopt_long(argc, argv, "p:s:t:d:r:", long_options,
                           &option_index)) != -1) {
     switch (c) {
