@@ -1,5 +1,5 @@
 /**
- * @file perf_packets.h
+ * @file perf_interface.h
  * @brief struct definitions for packets that perf and SPE emit.
  * @author Kaustubh Khulbe
  * @ingroup Graviton Software
@@ -18,7 +18,7 @@
 
 #define AUX_EVENT_RETIRED 1 << 1
 #define AUX_EVENT_BRANCH_NOT_TAKEN 1 << 6
-#define AUX_EVENT_BRANCH_MISS 1 << 6
+#define AUX_EVENT_BRANCH_MISS 1 << 7
 
 #define DATA_SOURCE_L1 0b0000
 #define DATA_SOURCE_L2 0b1000

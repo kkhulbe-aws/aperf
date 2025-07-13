@@ -1,6 +1,6 @@
 #include "bmiss_map.h"
 
-struct btree *BMISS_MAP = NULL;
+struct btree *bmiss_map = NULL;
 
 /// @brief B-Tree function to compare the branch miss map entries
 /// @param a First element to compare
@@ -38,8 +38,8 @@ int bmiss_map_compare(const void *a, const void *b, void *udata) {
 
 /// @brief Initializes the BMISS_MAP
 void init_bmiss_map() {
-  BMISS_MAP = btree_new(sizeof(bmiss_map_entry_t), 0, bmiss_map_compare, NULL);
-  btree_clear(BMISS_MAP);
+  bmiss_map = btree_new(sizeof(bmiss_map_entry_t), 0, bmiss_map_compare, NULL);
+  btree_clear(bmiss_map);
 }
 
 /// @brief Inserts a bmiss_map_entry_t into the BMISS_MAP
@@ -48,16 +48,16 @@ void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
   bmiss_map_entry_t key = {.finode = entry_to_insert->finode,
                            .offset = entry_to_insert->offset};
 
-  const bmiss_map_entry_t *entry = btree_get(BMISS_MAP, &key);
+  const bmiss_map_entry_t *entry = btree_get(bmiss_map, &key);
 
   if (entry == NULL) {
     bmiss_map_entry_t new_entry = {0};
     new_entry.finode = entry_to_insert->finode;
     new_entry.offset = entry_to_insert->offset;
-    btree_set(BMISS_MAP, &new_entry);
+    btree_set(bmiss_map, &new_entry);
   }
 
-  entry = btree_get(BMISS_MAP, &key);
+  entry = btree_get(bmiss_map, &key);
   bmiss_map_entry_t updated_entry = {0};
 
   updated_entry.finode = entry->finode;
@@ -74,7 +74,7 @@ void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
       entry->mispredicted + entry_to_insert->mispredicted;
   updated_entry.branch_type = entry_to_insert->branch_type;
 
-  btree_set(BMISS_MAP, &updated_entry);
+  btree_set(bmiss_map, &updated_entry);
 }
 
 /// @brief Parses the raw SPE record into the format the BMISS_MAP uses

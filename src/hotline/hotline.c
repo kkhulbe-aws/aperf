@@ -32,7 +32,7 @@ void init_perf_hardware_event(cpu_session_t *session) {
                      PERF_SAMPLE_CPU | PERF_SAMPLE_DATA_SRC |
                      PERF_SAMPLE_IDENTIFIER | PERF_SAMPLE_BRANCH_STACK;
   attr.sample_period =
-      CPU_SYSTEM_CONFIG.frequency / PROFILE_CONFIGURATION.spe_sample_frequency;
+      cpu_system_config.frequency / profile_configuration.spe_sample_frequency;
   attr.sample_id_all = 1;
   attr.context_switch = 1;
   attr.aux_watermark = AUX_WATERMARK;
@@ -58,7 +58,7 @@ void init_perf_software_event(cpu_session_t *session) {
   attr.size = sizeof(attr);
   attr.config = PERF_COUNT_SW_DUMMY;
   attr.sample_period =
-      CPU_SYSTEM_CONFIG.frequency / PROFILE_CONFIGURATION.spe_sample_frequency;
+      cpu_system_config.frequency / profile_configuration.spe_sample_frequency;
   attr.sample_type = PERF_SAMPLE_IP | PERF_SAMPLE_TID | PERF_SAMPLE_TIME |
                      PERF_SAMPLE_CPU | PERF_SAMPLE_IDENTIFIER;
   attr.read_format = PERF_FORMAT_ID | PERF_FORMAT_SPE;
@@ -91,7 +91,7 @@ void mmap_perf_buffers(cpu_session_t *session) {
   get_perf_buffer_sizes(&buffer_sizes);
 
   struct perf_event_mmap_page *meta_page = (struct perf_event_mmap_page *)mmap(
-      NULL, buffer_sizes.perf_record_buf_sz + CPU_SYSTEM_CONFIG.page_size,
+      NULL, buffer_sizes.perf_record_buf_sz + cpu_system_config.page_size,
       PROT_READ | PROT_WRITE, MAP_SHARED, session->hardware_fd, 0);
 
   ASSERT(meta_page != MAP_FAILED, "Failed to mmap perf buffer.");
@@ -106,7 +106,7 @@ void mmap_perf_buffers(cpu_session_t *session) {
   ASSERT(aux_buffer != MAP_FAILED, "Failed to mmap aux buffer.");
 
   session->meta_page = meta_page;
-  session->perf_record_buffer = (char *)meta_page + CPU_SYSTEM_CONFIG.page_size;
+  session->perf_record_buffer = (char *)meta_page + cpu_system_config.page_size;
   session->perf_aux_buffer = aux_buffer;
 }
 
@@ -151,10 +151,10 @@ void configure_session_conv(cpu_session_t *session) {
 
 /// @brief Initializes all the perf events for each CPU
 void init_sessions() {
-  sessions = malloc(sizeof(cpu_session_t) * CPU_SYSTEM_CONFIG.num_cpus);
-  memset(sessions, 0, sizeof(cpu_session_t) * CPU_SYSTEM_CONFIG.num_cpus);
+  sessions = malloc(sizeof(cpu_session_t) * cpu_system_config.num_cpus);
+  memset(sessions, 0, sizeof(cpu_session_t) * cpu_system_config.num_cpus);
   ASSERT(sessions != NULL, "Failed to malloc sessions.");
-  for (int i = 0; i < CPU_SYSTEM_CONFIG.num_cpus; i++) {
+  for (int i = 0; i < cpu_system_config.num_cpus; i++) {
     sessions[i].cpu = i;
     init_perf_events(&sessions[i]);
     configure_session_conv(&sessions[i]);
@@ -163,7 +163,7 @@ void init_sessions() {
 
 /// @brief Enables perf profiling across all CPUs
 void enable_perf_profiling() {
-  for (int i = 0; i < CPU_SYSTEM_CONFIG.num_cpus; i++) {
+  for (int i = 0; i < cpu_system_config.num_cpus; i++) {
     toggle_pmu(&sessions[i], PERF_EVENT_IOC_ENABLE);
   }
 }
@@ -390,7 +390,7 @@ void process_aux_buffer(cpu_session_t *session) {
   }
 }
 
-/// @brief Serializes the LAT_MAP and BMISS_MAP into files
+/// @brief Serializes the lat_map and BMISS_MAP into files
 void serialize_maps() {
   printf("SERIALIZING\n");
   char path[512];
@@ -402,14 +402,14 @@ void serialize_maps() {
 
   // open load file
   int res =
-      snprintf(path, sizeof(path), "%s/%s", PROFILE_CONFIGURATION.data_dir,
-               PROFILE_CONFIGURATION.lat_map_filename);
+      snprintf(path, sizeof(path), "%s/%s", profile_configuration.data_dir,
+               profile_configuration.lat_map_filename);
   ASSERT(res >= 0, "Failed to create load path.");
   load_fp = fopen(path, "w");
 
   // open branch file
-  res = snprintf(path, sizeof(path), "%s/%s", PROFILE_CONFIGURATION.data_dir,
-                 PROFILE_CONFIGURATION.bmiss_map_filename);
+  res = snprintf(path, sizeof(path), "%s/%s", profile_configuration.data_dir,
+                 profile_configuration.bmiss_map_filename);
   ASSERT(res >= 0, "Failed to create branch path.");
   branch_fp = fopen(path, "w");
 
@@ -432,14 +432,14 @@ void serialize_maps() {
   ASSERT(res >= 0, "Failed to write branch header.");
 
   // write load entries
-  iter = btree_iter_new(LAT_MAP);
+  iter = btree_iter_new(lat_map);
   ok = btree_iter_seek(iter, &(lat_map_entry_t){});
 
   while (ok) {
     const lat_map_entry_t *entry = btree_iter_item(iter);
     finode_map_entry_t key = {0};
     key.finode = entry->finode;
-    const finode_map_entry_t *finode_entry = btree_get(FINODE_MAP, &key);
+    const finode_map_entry_t *finode_entry = btree_get(finode_map, &key);
 
     ASSERT(finode_entry != NULL, "Failed to recover filename.");
 
@@ -465,14 +465,14 @@ void serialize_maps() {
   }
 
   // write branch entries
-  iter = btree_iter_new(BMISS_MAP);
+  iter = btree_iter_new(bmiss_map);
   ok = btree_iter_seek(iter, &(bmiss_map_entry_t){});
 
   while (ok) {
     const bmiss_map_entry_t *entry = btree_iter_item(iter);
     finode_map_entry_t key = {0};
     key.finode = entry->finode;
-    const finode_map_entry_t *finode_entry = btree_get(FINODE_MAP, &key);
+    const finode_map_entry_t *finode_entry = btree_get(finode_map, &key);
 
     ASSERT(finode_entry != NULL, "Failed to recover filename.");
 
@@ -500,12 +500,12 @@ void hotline(int argc, char *argv[]) {
   init_bmiss_map();
 
   int iters =
-      PROFILE_CONFIGURATION.timeout / PROFILE_CONFIGURATION.wakeup_period;
+      profile_configuration.timeout / profile_configuration.wakeup_period;
   enable_perf_profiling();
 
   for (int i = 0; i < iters; i++) {
-    sleep(PROFILE_CONFIGURATION.wakeup_period);
-    for (int c = 0; c < CPU_SYSTEM_CONFIG.num_cpus; c++) {
+    sleep(profile_configuration.wakeup_period);
+    for (int c = 0; c < cpu_system_config.num_cpus; c++) {
       process_aux_buffer(&sessions[c]);
     }
   }

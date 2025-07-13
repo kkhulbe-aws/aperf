@@ -18,11 +18,13 @@
 #define PROFILE_DEFAULT_WAKEUP_PERIOD 1       // 1s
 #define PROFILE_DEFAULT_SPE_SAMPLE_FREQ 1000  // 1kHz
 #define PROFILE_DEFAULT_TIMEOUT 10            // 10s
+#define PROFILE_DEFAULT_NUM_REPORT 1000
 
 typedef struct profile_config {
   uint32_t wakeup_period;
   uint32_t spe_sample_frequency;
   uint32_t timeout;
+  uint32_t num_to_report;
   char *data_dir;
   char *report_dir;
   char *bmiss_map_filename;
@@ -39,6 +41,6 @@ void parse_arguments(int argc, char *argv[]);
 
 void get_perf_buffer_sizes(perf_buffer_size_t *buffer_sizes);
 
-extern profile_config_t PROFILE_CONFIGURATION;
+extern profile_config_t profile_configuration;
 
 #endif  // CONFIG_H_

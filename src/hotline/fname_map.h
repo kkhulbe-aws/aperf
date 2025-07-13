@@ -17,7 +17,7 @@
 #include "btree.h"
 #include "finode_map.h"
 #include "log.h"
-#include "perf_packets.h"
+#include "perf_interface.h"
 #include "sys.h"
 #include "vec.h"
 
@@ -58,6 +58,6 @@ int va_to_file_offset(uint64_t pc, pid_t pid, finode_t *finode,
                       uint64_t *offset);
 
 /// @brief Exposed B-Tree structure for all file mappings
-extern struct btree *FNAME_MAP;
+extern struct btree *fname_map;
 
 #endif  // FNAME_MAP_H_

@@ -22,7 +22,7 @@
 #include "finode_map.h"
 #include "fname_map.h"
 #include "lat_map.h"
-#include "perf_packets.h"
+#include "perf_interface.h"
 #include "sys.h"
 
 // Referenced from ARM Neoverse V2 Core TRM, Section 22

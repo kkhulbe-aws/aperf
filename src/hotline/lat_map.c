@@ -1,6 +1,6 @@
 #include "lat_map.h"
 
-struct btree *LAT_MAP = NULL;
+struct btree *lat_map = NULL;
 
 /// @brief B-Tree comparison function for `lat_map_entry_t`
 /// @param a First entry to compare
@@ -39,28 +39,37 @@ int lat_map_compare(const void *a, const void *b, void *udata) {
   return 0;
 }
 
-/// @brief Initializes the LAT_MAP
+/// @brief Initializes the lat_map
 void init_lat_map() {
-  LAT_MAP = btree_new(sizeof(lat_map_entry_t), 0, lat_map_compare, NULL);
-  btree_clear(LAT_MAP);
+  lat_map = btree_new(sizeof(lat_map_entry_t), 0, lat_map_compare, NULL);
+  btree_clear(lat_map);
 }
 
-/// @brief Inserts a `lat_map_entry_t` into the LAT_MAP
+static inline void update_histogram(completion_histogram_t *dst,
+                                    const completion_histogram_t *src1,
+                                    const completion_histogram_t *src2) {
+  dst->l1_bound_bin = src1->l1_bound_bin + src2->l1_bound_bin;
+  dst->l2_bound_bin = src1->l2_bound_bin + src2->l2_bound_bin;
+  dst->l3_bound_bin = src1->l3_bound_bin + src2->l3_bound_bin;
+  dst->dram_bound_bin = src1->dram_bound_bin + src2->dram_bound_bin;
+}
+
+/// @brief Inserts a `lat_map_entry_t` into the lat_map
 /// @param entry_to_insert Entry to insert
 void insert_lat_map_entry(lat_map_entry_t *entry_to_insert) {
   lat_map_entry_t key = {.finode = entry_to_insert->finode,
                          .offset = entry_to_insert->offset};
 
-  const lat_map_entry_t *entry = btree_get(LAT_MAP, &key);
+  const lat_map_entry_t *entry = btree_get(lat_map, &key);
 
   if (entry == NULL) {
     lat_map_entry_t new_entry = {0};
     new_entry.finode = entry_to_insert->finode;
     new_entry.offset = entry_to_insert->offset;
-    btree_set(LAT_MAP, &new_entry);
+    btree_set(lat_map, &new_entry);
   }
 
-  entry = btree_get(LAT_MAP, &key);
+  entry = btree_get(lat_map, &key);
   lat_map_entry_t updated_entry = {0};  // copy over existing + new stats into a
                                         // new entry, then call btree_set
                                         // we need to btree_get again because
@@ -78,17 +87,17 @@ void insert_lat_map_entry(lat_map_entry_t *entry_to_insert) {
   updated_entry.saturated = entry->saturated + entry_to_insert->saturated;
   updated_entry.retired = entry->retired + entry_to_insert->retired;
 
-  UPDATE_HISTOGRAM(updated_entry, entry, entry_to_insert, l1);
-  UPDATE_HISTOGRAM(updated_entry, entry, entry_to_insert, l2);
-  UPDATE_HISTOGRAM(updated_entry, entry, entry_to_insert, l3);
-  UPDATE_HISTOGRAM(updated_entry, entry, entry_to_insert, dram);
+  for (int i = 0; i < 4; i++) {
+    update_histogram(&updated_entry.histograms[i], &entry->histograms[i],
+                     &entry_to_insert->histograms[i]);
+  }
 
-  btree_set(LAT_MAP, &updated_entry);
+  btree_set(lat_map, &updated_entry);
 }
 
-/// @brief Parses a raw SPE entry into a struct that LAT_MAP can use
+/// @brief Parses a raw SPE entry into a struct that lat_map can use
 /// @param record Raw record to parse
-/// @param entry LAT_MAP struct to parse into
+/// @param entry lat_map struct to parse into
 /// @param filename Filename to associate, decoded from `pc_to_file_offset`
 /// @param offset File offset to associate, decoded from `pc_to_file_offset`
 void parse_lat_map_entry(aux_record_raw_t *record, lat_map_entry_t *entry,
@@ -129,11 +138,11 @@ void parse_lat_map_entry(aux_record_raw_t *record, lat_map_entry_t *entry,
   uint64_t execution_latency =
       entry->total_latency - entry->issue_latency - entry->translation_latency;
 
-  if (execution_latency <= CPU_SYSTEM_CONFIG.latency_limits.l1_max_cycles)
+  if (execution_latency <= cpu_system_config.latency_limits.l1_max_cycles)
     bin->l1_bound_bin = 1;
-  else if (execution_latency <= CPU_SYSTEM_CONFIG.latency_limits.l2_max_cycles)
+  else if (execution_latency <= cpu_system_config.latency_limits.l2_max_cycles)
     bin->l2_bound_bin = 1;
-  else if (execution_latency <= CPU_SYSTEM_CONFIG.latency_limits.l3_max_cycles)
+  else if (execution_latency <= cpu_system_config.latency_limits.l3_max_cycles)
     bin->l3_bound_bin = 1;
   else
     bin->dram_bound_bin = 1;

@@ -6,7 +6,7 @@ static const Dwfl_Callbacks callbacks = {
     .section_address = dwfl_offline_section_address,
 };
 
-struct btree *FNAME_BINARY_MAP = NULL;
+struct btree *fname_binary_map = NULL;
 
 int fname_binary_map_compare(const void *a, const void *b, void *udata) {
   const fname_binary_map_entry_t *ua = a;
@@ -131,9 +131,9 @@ cleanup_info:
 }
 
 void init_fname_binary_btree() {
-  FNAME_BINARY_MAP = btree_new(sizeof(fname_binary_map_entry_t), 0,
+  fname_binary_map = btree_new(sizeof(fname_binary_map_entry_t), 0,
                                fname_binary_map_compare, NULL);
-  btree_clear(FNAME_BINARY_MAP);
+  btree_clear(fname_binary_map);
 }
 
 binary_info_t *get_fname_binary_map_entry(char *filename) {
@@ -141,11 +141,11 @@ binary_info_t *get_fname_binary_map_entry(char *filename) {
   fname_entry.filename = filename;
 
   const fname_binary_map_entry_t *result =
-      btree_get(FNAME_BINARY_MAP, &fname_entry);
+      btree_get(fname_binary_map, &fname_entry);
   if (result == NULL) {  // need to load binary now
     binary_info_t *info = load_binary(filename);
     fname_entry.binary_info = info;
-    btree_set(FNAME_BINARY_MAP, &fname_entry);
+    btree_set(fname_binary_map, &fname_entry);
     return info;
   } else {
     return result->binary_info;  // already loaded previously, just recycle
@@ -185,7 +185,8 @@ char *get_assembly(binary_info_t *info, uint64_t offset) {
       size_t len = strlen(insn[0].mnemonic) + strlen(insn[0].op_str) + 2;
       assembly = malloc(len);
       if (assembly) {
-        int res = snprintf(assembly, len, "%s %s", insn[0].mnemonic, insn[0].op_str);
+        int res =
+            snprintf(assembly, len, "%s %s", insn[0].mnemonic, insn[0].op_str);
         ASSERT(res > 0, "snprintf failed.");
 
         // Replace commas with spaces

@@ -1,6 +1,6 @@
 #include "finode_map.h"
 
-struct btree *FINODE_MAP = NULL;
+struct btree *finode_map = NULL;
 
 int finode_compare(const void *a, const void *b, void *udata) {
     const finode_t *fa = &((const finode_map_entry_t *)a)->finode;
@@ -25,8 +25,8 @@ int finode_compare(const void *a, const void *b, void *udata) {
 }
 
 void init_finode_map() {
-  FINODE_MAP = btree_new(sizeof(finode_map_entry_t), 0, finode_compare, NULL);
-  btree_clear(FINODE_MAP);
+  finode_map = btree_new(sizeof(finode_map_entry_t), 0, finode_compare, NULL);
+  btree_clear(finode_map);
 }
 
 void insert_finode_entry(mmap2_record_t *record) {
@@ -41,5 +41,5 @@ void insert_finode_entry(mmap2_record_t *record) {
         ((struct perf_event_header *) record)->size - fixed_size - sizeof(struct sample_id);
 
     entry.filename = strdup(record->filename);
-    btree_set(FINODE_MAP, &entry);
+    btree_set(finode_map, &entry);
 }

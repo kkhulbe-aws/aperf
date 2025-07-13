@@ -13,7 +13,7 @@
 
 #include "btree.h"
 #include "finode_map.h"
-#include "perf_packets.h"
+#include "perf_interface.h"
 
 typedef struct bmiss_map_entry {
   union {  // union allows data storing and report generation to use the same
@@ -36,5 +36,5 @@ void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert);
 void parse_bmiss_map_entry(aux_record_raw_t *record, bmiss_map_entry_t *entry,
                            finode_t *finode, uint64_t offset);
 
-extern struct btree *BMISS_MAP;
+extern struct btree *bmiss_map;
 #endif  // BMISS_MAP_H_

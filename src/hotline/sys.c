@@ -1,6 +1,6 @@
 #include "sys.h"
 
-cpu_system_configuration_t CPU_SYSTEM_CONFIG;
+cpu_system_configuration_t cpu_system_config;
 
 /// @brief Opens a file descriptor to cpuinfo
 /// @return File Descriptor
@@ -35,20 +35,32 @@ uint64_t get_cpu_part() {
 /// @brief Wrapper for page size to standardize everything
 uint64_t get_page_size() { return getpagesize(); }
 
-/// @brief Gets the frequency of the machine, given the Part Number
-/// @return CPU Frequency
+/// @brief Gets the frequency of the machine in Hz using dmidecode
+/// @return CPU Frequency in Hz
 uint64_t get_frequency() {
-  uint64_t part = get_cpu_part();
-
-  switch (part) {
-    case CPU_PART_ID_GRV3:
-      return CPU_FREQ_GRV3;
-    case CPU_PART_ID_GRV4:
-      return CPU_FREQ_GRV4;
-    default:
-      ASSERT(0, "Unknown CPU part.");
-      break;
+  FILE *fp =
+      popen("sudo dmidecode -t processor | grep 'Speed' | head -n1", "r");
+  if (!fp) {
+    ASSERT(0, "Failed to run dmidecode");
+    return 0;
   }
+
+  char line[256];
+  uint64_t mhz = 0;
+
+  if (fgets(line, sizeof(line), fp)) {
+    // Line format: "Current Speed: 2400 MHz"
+    char *speed_str = strstr(line, ":");
+    if (speed_str) {
+      mhz = strtoull(speed_str + 1, NULL, 10);  // +1 to skip the colon
+    }
+  }
+
+  pclose(fp);
+
+  ASSERT(mhz > 0, "Failed to get CPU frequency\n");
+
+  return mhz * 1000000ULL;  // Convert MHz to Hz
 }
 
 /// @brief Wrapper to get num CPUs
@@ -79,12 +91,12 @@ void get_latency_bins(completion_latency_limits_t *limits) {
 
 /// @brief Initializes global CPU_SYSTEM_CONFIG struct
 void init_sys_info() {
-  CPU_SYSTEM_CONFIG.cpu_part = get_cpu_part();
-  CPU_SYSTEM_CONFIG.frequency = get_frequency();
-  CPU_SYSTEM_CONFIG.page_size = get_page_size();
-  CPU_SYSTEM_CONFIG.num_cpus = get_num_cpus();
+  cpu_system_config.cpu_part = get_cpu_part();
+  cpu_system_config.frequency = get_frequency();
+  cpu_system_config.page_size = get_page_size();
+  cpu_system_config.num_cpus = get_num_cpus();
 
-  get_latency_bins(&CPU_SYSTEM_CONFIG.latency_limits);
+  get_latency_bins(&cpu_system_config.latency_limits);
 }
 
 void get_file_info(const char *filename, finode_t *finode) {

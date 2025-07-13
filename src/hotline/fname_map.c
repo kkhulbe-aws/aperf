@@ -2,7 +2,7 @@
 
 #include <stdio.h>
 
-struct btree *FNAME_MAP = NULL;
+struct btree *fname_map = NULL;
 const filename_entry_t *cached_entry[CACHE_DEPTH] = {NULL};
 
 /// @brief B-Tree compare function for FNAME_MAP structs
@@ -34,7 +34,7 @@ void insert_initial_mappings() {
 
     char maps_path[256];
     int res = snprintf(maps_path, sizeof(maps_path), "/proc/%.230s/maps",
-             pid_entry->d_name);
+                       pid_entry->d_name);
     ASSERT(res > 0, "snprintf failed.");
 
     FILE *maps = fopen(maps_path, "r");
@@ -88,8 +88,8 @@ void insert_initial_mappings() {
 
 /// @brief Initializes FNAME_MAP data structures
 void init_fname_map() {
-  FNAME_MAP = btree_new(sizeof(filename_entry_t), 0, fname_compare, NULL);
-  btree_clear(FNAME_MAP);
+  fname_map = btree_new(sizeof(filename_entry_t), 0, fname_compare, NULL);
+  btree_clear(fname_map);
 
   insert_initial_mappings();
 }
@@ -99,7 +99,7 @@ void init_fname_map() {
 void insert_fname_entry(mmap2_record_t *record) {
   filename_entry_t key = {.pid = record->pid};
 
-  const filename_entry_t *entry = btree_get(FNAME_MAP, &key);
+  const filename_entry_t *entry = btree_get(fname_map, &key);
 
   // If the key does not exist (NULL), set up a new key, and allocate a new
   // vector for the MMAP data
@@ -109,13 +109,13 @@ void insert_fname_entry(mmap2_record_t *record) {
 
     new_entry.virtual_address_map = vector_create();
 
-    btree_set(FNAME_MAP, &new_entry);
+    btree_set(fname_map, &new_entry);
   }
 
   // After that, when it is guaranteed an entry exists, extract it
   // and insert the new offset mapping into the vector
 
-  entry = btree_get(FNAME_MAP, &key);
+  entry = btree_get(fname_map, &key);
   pid_virtual_map_entry_t **virtual_address_map = entry->virtual_address_map;
   // char *filename = strdup(record->filename);
 
@@ -143,7 +143,7 @@ void free_filename_entry(filename_entry_t *entry_to_remove) {
   }
 
   vector_free(entry_to_remove->virtual_address_map);
-  btree_delete(FNAME_MAP, entry_to_remove);
+  btree_delete(fname_map, entry_to_remove);
 }
 
 /// @brief Returns a cached entry or NULL if it doesn't exist.
@@ -180,7 +180,7 @@ void prune_filename_cache(pid_t pid) {
 /// @param pid PID to remove mappings for
 void remove_fname_entry(pid_t pid) {
   filename_entry_t *entry =
-      (filename_entry_t *)btree_get(FNAME_MAP, &(filename_entry_t){.pid = pid});
+      (filename_entry_t *)btree_get(fname_map, &(filename_entry_t){.pid = pid});
   if (entry != NULL) {
     free_filename_entry(entry);
     prune_filename_cache(pid);
@@ -199,7 +199,7 @@ int va_to_file_offset(uint64_t pc, pid_t pid, finode_t *finode,
                       uint64_t *offset) {
   const filename_entry_t *entry = get_filename_cached_entry(pid);
   if (entry == NULL)
-    entry = btree_get(FNAME_MAP, &(filename_entry_t){.pid = pid});
+    entry = btree_get(fname_map, &(filename_entry_t){.pid = pid});
 
   if (entry == NULL || entry->pid != pid) return -1;
 

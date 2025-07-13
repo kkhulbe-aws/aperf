@@ -1,5 +1,7 @@
 #include "report.h"
 
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
+
 bmiss_map_entry_t *process_bmiss_map_entries(const char *filename,
                                              uint64_t *out_count) {
   FILE *fp = fopen(filename, "r");
@@ -15,7 +17,6 @@ bmiss_map_entry_t *process_bmiss_map_entries(const char *filename,
   ASSERT(entries != NULL, "Failed to allocate memory for entries.");
 
   if ((read = getline(&line, &len, fp)) == -1) {
-    printf("File %s\n", filename);
     free(line);
     free(entries);
     fclose(fp);
@@ -40,23 +41,24 @@ bmiss_map_entry_t *process_bmiss_map_entries(const char *filename,
     bmiss_map_entry_t *entry = &entries[entry_count];
 
     // Temporary buffer for filename
-    char temp_filename[1024];
+    char temp_filename[4096] = {0};
 
     int result =
-        sscanf(line, "%[^,],%lx,%lu,%lu,%lu,%lu,%lu,%lu,%hhu", temp_filename,
+        sscanf(line, "%[^,],%lx,%lu,%lu,%lu,%lu,%lu,%lu,%hhx", temp_filename,
                &entry->offset, &entry->retired, &entry->not_taken,
                &entry->mispredicted, &entry->total_latency,
                &entry->issue_latency, &entry->saturated, &entry->branch_type);
 
-      ASSERT(result == 9, "failed to sscanf line correctly.");
-      // Allocate memory for the filename and copy it
-      entry->filename = strdup(temp_filename);
-      if (entry->filename == NULL) {
-        // Handle memory allocation failure
-        fprintf(stderr, "Failed to allocate memory for filename\n");
-        continue;
-      }
-      entry_count++;
+    ASSERT(result == 9, "failed to sscanf line correctly.");
+
+    // Allocate memory for the filename and copy it
+    entry->filename = strdup(temp_filename);
+    if (entry->filename == NULL) {
+      // Handle memory allocation failure
+      fprintf(stderr, "Failed to allocate memory for filename\n");
+      continue;
+    }
+    entry_count++;
   }
 
   if (entry_count > 0) {
@@ -112,7 +114,7 @@ lat_map_entry_t *process_lat_map_entries(const char *filename,
     lat_map_entry_t *entry = &entries[entry_count];
 
     // Temporary buffer for filename
-    char temp_filename[1024];
+    char temp_filename[4096];
 
     int result = sscanf(line,
                         "%[^,],%lx,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,%ld,"
@@ -180,7 +182,7 @@ void generate_bmiss_report(char *file_dir, bmiss_map_entry_t *entries,
           "Saturated,Location,Line,Function,Assembly\n");
 
   qsort(entries, count, sizeof(bmiss_map_entry_t), compare_bmiss_entries);
-  for (size_t i = 0; i < count; i++) {
+  for (size_t i = 0; i < MIN(count, profile_configuration.num_to_report); i++) {
     const bmiss_map_entry_t *entry = &entries[i];
 
     debug_info_t *dinfo = get_debug_info(entry->filename, entry->offset);
@@ -328,7 +330,7 @@ void write_lat_map_sub_report(lat_map_entry_t *entries, uint64_t count,
                                                const debug_info_t *)) {
   qsort(entries, count, sizeof(lat_map_entry_t), compare_fn);
 
-  for (size_t i = 0; i < count; i++) {
+  for (size_t i = 0; i < MIN(count, profile_configuration.num_to_report); i++) {
     const lat_map_entry_t *entry = &entries[i];
     debug_info_t *dinfo = get_debug_info(entry->filename, entry->offset);
     print_fn(fp, entry, dinfo);
@@ -383,40 +385,45 @@ int deserialize_maps(int argc, char *argv[]) {
   uint64_t count;
 
   // For bmiss map data
-  size_t bmiss_len = strlen(PROFILE_CONFIGURATION.data_dir) +
-                     strlen(PROFILE_CONFIGURATION.bmiss_map_filename) + 1;
+  // For bmiss map data
+  size_t bmiss_len = strlen(profile_configuration.data_dir) +
+                     strlen(profile_configuration.bmiss_map_filename) +
+                     2;  // +2 for '/' and '\0'
+
   char *bmiss_data_path = malloc(bmiss_len);
   if (!bmiss_data_path) {
     perror("Failed to allocate memory for bmiss path");
     return -1;
   }
+
   int res = snprintf(bmiss_data_path, bmiss_len, "%s/%s",
-                     PROFILE_CONFIGURATION.data_dir,
-                     PROFILE_CONFIGURATION.bmiss_map_filename);
+                     profile_configuration.data_dir,
+                     profile_configuration.bmiss_map_filename);
+
   ASSERT(res > 0, "snprintf failed.");
 
   // Process bmiss entries
   bmiss_map_entry_t *b_entries =
       process_bmiss_map_entries(bmiss_data_path, &count);
-  generate_bmiss_report(PROFILE_CONFIGURATION.report_dir, b_entries, count);
+  generate_bmiss_report(profile_configuration.report_dir, b_entries, count);
   free(bmiss_data_path);
 
   // For lat map data
-  size_t lat_len = strlen(PROFILE_CONFIGURATION.data_dir) +
-                   strlen(PROFILE_CONFIGURATION.lat_map_filename) + 1;
+  size_t lat_len = strlen(profile_configuration.data_dir) +
+                   strlen(profile_configuration.lat_map_filename) + 2;
   char *lat_data_path = malloc(lat_len);
   if (!lat_data_path) {
     perror("Failed to allocate memory for lat path");
     return -1;
   }
   res =
-      snprintf(lat_data_path, lat_len, "%s/%s", PROFILE_CONFIGURATION.data_dir,
-               PROFILE_CONFIGURATION.lat_map_filename);
+      snprintf(lat_data_path, lat_len, "%s/%s", profile_configuration.data_dir,
+               profile_configuration.lat_map_filename);
   ASSERT(res > 0, "snprintf failed.");
 
   // Process lat entries
   lat_map_entry_t *l_entries = process_lat_map_entries(lat_data_path, &count);
-  generate_lat_report(PROFILE_CONFIGURATION.report_dir, l_entries, count);
+  generate_lat_report(profile_configuration.report_dir, l_entries, count);
   free(lat_data_path);
 
   return 0;

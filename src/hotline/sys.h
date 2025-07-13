@@ -47,5 +47,5 @@ void init_sys_info();
 void get_file_info(const char *filename, finode_t *finode);
 
 /// @brief Exposed global system configuration for other modules to use
-extern cpu_system_configuration_t CPU_SYSTEM_CONFIG;
+extern cpu_system_configuration_t cpu_system_config;
 #endif  // SYS_H_

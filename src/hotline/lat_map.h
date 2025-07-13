@@ -14,7 +14,7 @@
 #include "btree.h"
 #include "finode_map.h"
 #include "log.h"
-#include "perf_packets.h"
+#include "perf_interface.h"
 #include "sys.h"
 
 #define UPDATE_HISTOGRAM(dst, src1, src2, level)                 \
@@ -48,7 +48,12 @@ typedef struct lat_map_entry {
   uint64_t translation_latency;
   uint64_t saturated;
   uint64_t retired;
-  completion_histogram_t l1, l2, l3, dram;  // @todo: change to an array
+  union {
+    struct {
+      completion_histogram_t l1, l2, l3, dram;
+    };
+    completion_histogram_t histograms[4];  // Array access option
+  };
 } lat_map_entry_t;
 
 void init_lat_map();
@@ -56,5 +61,5 @@ void insert_lat_map_entry(lat_map_entry_t *entry);
 void parse_lat_map_entry(aux_record_raw_t *record, lat_map_entry_t *entry,
                          finode_t *finode, uint64_t offset);
 
-extern struct btree *LAT_MAP;
+extern struct btree *lat_map;
 #endif  // LAT_MAP_H_

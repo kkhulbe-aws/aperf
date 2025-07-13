@@ -13,7 +13,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "perf_packets.h"
+#include "perf_interface.h"
 #include "btree.h"
 
 typedef struct finode {
@@ -31,6 +31,6 @@ typedef struct finode_map_entry {
 void init_finode_map();
 void insert_finode_entry(mmap2_record_t *record);
 
-extern struct btree *FINODE_MAP;
+extern struct btree *finode_map;
 
 #endif // FINODE_MAP_H_
