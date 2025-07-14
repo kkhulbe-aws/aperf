@@ -220,7 +220,6 @@ impl CollectData for HotlineRaw {
             if killpg(self.pid, SIGTERM) == -1 {
                 let err = std::io::Error::last_os_error();
                 eprintln!("Warning: Failed to kill process group: {}", err);
-                // Continue despite error
             }
 
             // Wait for the child process to finish
@@ -231,12 +230,7 @@ impl CollectData for HotlineRaw {
                     eprintln!("Warning: Failed to wait for child process: {}", err);
                 }
                 _ => {
-                    if libc::WIFEXITED(status) {
-                        let exit_status = libc::WEXITSTATUS(status);
-                    } else if libc::WIFSIGNALED(status) {
-                        let term_sig = libc::WTERMSIG(status);
-                        eprintln!("Child process terminated by signal: {}", term_sig);
-                    }
+                     
                 }
             }
         }
@@ -264,6 +258,8 @@ impl GetData for Hotline {
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
         let args = vec![
             CString::new("hotline").unwrap(),
+            CString::new("--num_to_report").unwrap(),
+            CString::new(params.num_to_report.to_string()).unwrap(),
             CString::new("--data_dir").unwrap(),
             CString::new(params.data_dir.to_str().unwrap()).unwrap(),
             CString::new("--report_dir").unwrap(),

@@ -80,7 +80,7 @@ impl CollectorParams {
             pmu_config: Option::None,
             perf_frequency: 99,
             spe_sample_frequency: 1000,
-            interval: 1000
+            interval: 1
         }
     }
 }

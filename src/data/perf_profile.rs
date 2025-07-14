@@ -15,7 +15,6 @@ use std::{
     process::{Child, Command, Stdio},
     sync::Mutex,
 };
-use log::{debug, info};
 
 pub static PERF_PROFILE_FILE_NAME: &str = "perf_profile";
 pub static PERF_TOP_FUNCTIONS_FILE_NAME: &str = "top_functions";
@@ -39,7 +38,6 @@ impl PerfProfileRaw {
 
 impl CollectData for PerfProfileRaw {
     fn prepare_data_collector(&mut self, params: &CollectorParams) -> Result<()> {
-        info!("Perf prepare data collector");
         match Command::new("perf")
             .stdout(Stdio::null())
             .args([

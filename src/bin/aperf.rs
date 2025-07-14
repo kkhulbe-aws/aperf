@@ -4,7 +4,6 @@ use aperf::record::{record, Record};
 use aperf::report::{report, Report};
 use aperf::{PDError, APERF_RUNLOG, APERF_TMP};
 use clap::{Parser, Subcommand};
-
 use log::LevelFilter;
 use log4rs::{
     append::console::ConsoleAppender,

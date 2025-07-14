@@ -15,7 +15,7 @@ pub struct ReportParams {
     pub report_dir: PathBuf,
     pub run_name: String,
     pub data_file_path: PathBuf,
-    pub max_report_entries: u32,
+    pub num_to_report: u32,
 }
 
 impl ReportParams {
@@ -26,7 +26,7 @@ impl ReportParams {
             report_dir: PathBuf::new(),
             run_name: String::new(),
             data_file_path: PathBuf::new(),
-            max_report_entries: 1000
+            num_to_report: 5000
         }
     }
 }
