@@ -59,8 +59,8 @@ This project develops a front-end for memory profiling using the ARM Statistical
 ## System Usage
 
 ### Performance Overhead
-- **Memory**: Peak RSS ~78MB (0.6% of system memory during 30-minute concurrent workload)
-- **CPU**: Minimal overhead (1-3% for most applications) with 1-second wakeup periods
+- 2 - 4 parallel `sv1` processes were run. At the peak CPU utilization, the system had 2 `sv1` processes, and 2 `STREAM` processes.
+![System Utilization](./figs/process_metrics.png "System Utilization")
 
 ## Future Improvements
 - On serialization, write all B-Tree states directly into an mmap-able region, and on report generation read from there.
