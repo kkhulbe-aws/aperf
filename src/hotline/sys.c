@@ -99,6 +99,10 @@ void init_sys_info() {
   get_latency_bins(&cpu_system_config.latency_limits);
 }
 
+/// @brief Returns the inode information associated with a file. Used for
+/// initial mappings for /proc/maps
+/// @param filename Filename to get information of
+/// @param finode finode_t struct to populate
 void get_file_info(const char *filename, finode_t *finode) {
   // Handle special cases
   if (strncmp(filename, "anon_inode:", 11) == 0 || filename[0] == '[') {

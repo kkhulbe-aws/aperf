@@ -8,14 +8,22 @@ static const Dwfl_Callbacks callbacks = {
 
 struct btree *fname_binary_map = NULL;
 
+/// @brief Comparison function for filename binary mappings
+/// @param a First fname_binary_entry to compare
+/// @param b Second fname_binary_entry to compare
+/// @param udata Unused
+/// @return 1 if a > b, -1 if a < b, 0 if a = b
 int fname_binary_map_compare(const void *a, const void *b, void *udata) {
+  (void)udata;
   const fname_binary_map_entry_t *ua = a;
   const fname_binary_map_entry_t *ub = b;
 
   return strcmp(ua->filename, ub->filename);
 }
 
-// Helper function to process ELF sections
+/// @brief Helper function to process ELF sections
+/// @param info Binary info struct to populate with ELF information
+/// @return true if successfully mapped file, false otherwise
 bool process_elf_sections(binary_info_t *info) {
   for (int i = 0; i < info->ehdr->e_shnum; i++) {
     char *section_name = info->shstrtab + info->shdr[i].sh_name;
@@ -34,7 +42,10 @@ bool process_elf_sections(binary_info_t *info) {
   return (info->text_section && info->symtab && info->strtab);
 }
 
-// Helper function to initialize DWARF debug info
+/// @brief Helper function to initialize DWARD debuf info
+/// @param info Debug info struct to populate
+/// @param filename File to populate struct for
+/// @return true if successfully initialized, false otherwise
 bool init_dwarf_info(binary_info_t *info, const char *filename) {
   info->dwfl = dwfl_begin(&callbacks);
   if (!info->dwfl) {
@@ -56,13 +67,18 @@ bool init_dwarf_info(binary_info_t *info, const char *filename) {
   return true;
 }
 
+/// @brief Loads all the information for a binary and returns a pointer to the
+/// struct
+/// @param filename Binary file to load
+/// @return Pointer to populated struct
 binary_info_t *load_binary(const char *filename) {
   // Allocate and initialize binary info structure
-  binary_info_t *info = calloc(1, sizeof(binary_info_t));
-  if (!info) {
-    fprintf(stderr, "Failed to allocate memory for binary_info_t\n");
-    return NULL;
-  }
+  binary_info_t *info = malloc(sizeof(binary_info_t));
+  ASSERT(info, "Failed to allocate memory for binary_info_t");
+  memset(info, 0, sizeof(binary_info_t));
+
+  // The following errors are graceful, because we may not always be able to map
+  // a profiled binary bag with debug symbols.
 
   // Initialize Capstone
   if (cs_open(CS_ARCH_ARM64, CS_MODE_ARM, &info->cs_handle) != CS_ERR_OK) {
@@ -130,12 +146,17 @@ cleanup_info:
   return NULL;
 }
 
+/// @brief Initializes the mapping structure
 void init_fname_binary_btree() {
   fname_binary_map = btree_new(sizeof(fname_binary_map_entry_t), 0,
                                fname_binary_map_compare, NULL);
   btree_clear(fname_binary_map);
 }
 
+/// @brief If entry exists, returns it. Otherwise loads the binary and puts it
+/// in.
+/// @param filename Binary to search for
+/// @return Pointer to binary.
 binary_info_t *get_fname_binary_map_entry(char *filename) {
   fname_binary_map_entry_t fname_entry;
   fname_entry.filename = filename;
@@ -152,6 +173,10 @@ binary_info_t *get_fname_binary_map_entry(char *filename) {
   }
 }
 
+/// @brief Returns the function associated with the addr
+/// @param info Binary info structure for file
+/// @param addr Offset into file
+/// @return Function name
 char *get_function_name(binary_info_t *info, uint64_t addr) {
   if (!info || !info->symtab || !info->strtab) return NULL;
 
@@ -166,6 +191,10 @@ char *get_function_name(binary_info_t *info, uint64_t addr) {
   return NULL;
 }
 
+/// @brief Returns the assembly associated with the addr
+/// @param info Binary info structure for file
+/// @param addr Offset into file
+/// @return Assembly code
 char *get_assembly(binary_info_t *info, uint64_t offset) {
   char *assembly = NULL;
 
@@ -201,6 +230,10 @@ char *get_assembly(binary_info_t *info, uint64_t offset) {
   return assembly;
 }
 
+/// @brief Converts a relative path to an absolute path
+/// @param binary_path Location of binary file
+/// @param source_path Location of source *from* binary path
+/// @return Absolute path of source file
 char *get_absolute_source_path(const char *binary_path,
                                const char *source_path) {
   if (!source_path) {
@@ -240,6 +273,11 @@ char *get_absolute_source_path(const char *binary_path,
              : strdup(source_path);  // Fall back to original if realpath fails
 }
 
+/// @brief Gets the source code file from the binary file and offset
+/// @param binary_path Binary file path
+/// @param info Debug info struct containing the debug info
+/// @param addr Offset into binary file
+/// @return Source file information such as filename and line number
 source_file_info_t *get_source_info(char *binary_path, binary_info_t *info,
                                     uint64_t addr) {
   if (!info || !info->dwfl) {
@@ -280,6 +318,10 @@ source_file_info_t *get_source_info(char *binary_path, binary_info_t *info,
   return source_info;
 }
 
+/// @brief Converts a source file and target line into a line of code
+/// @param filename Source filename
+/// @param target_line Line to get code of
+/// @return Line of code at location
 char *get_line_at_line_number(const char *filename, int target_line) {
   FILE *file = fopen(filename, "r");
   if (!file) {
@@ -332,10 +374,16 @@ char *get_line_at_line_number(const char *filename, int target_line) {
   return quoted_line;
 }
 
+/// @brief Gets all the debug info (function, asm, source file, line number) for
+/// a filename and offset
+/// @param filename Filename to get info of
+/// @param offset Offset into file
+/// @return Populated pointer to debug_info_t struct
 debug_info_t *get_debug_info(char *filename, uint64_t offset) {
   binary_info_t *info = get_fname_binary_map_entry(filename);
-  debug_info_t *dinfo = calloc(1, sizeof(debug_info_t));
+  debug_info_t *dinfo = malloc(sizeof(debug_info_t));
   ASSERT(dinfo != NULL, "Failed to create debug info struct.")
+  memset(dinfo, 0, sizeof(debug_info_t));
 
   if (info) {
     const source_file_info_t *source = get_source_info(filename, info, offset);
@@ -365,26 +413,4 @@ debug_info_t *get_debug_info(char *filename, uint64_t offset) {
     }
   }
   return dinfo;
-}
-
-void print_debug_info(const debug_info_t *debug_info) {
-  if (!debug_info) {
-    printf("No debug info available\n");
-    return;
-  }
-
-  printf("Source file: %s\n",
-         debug_info->src_file ? debug_info->src_file : "(null)");
-
-  if (debug_info->line_num) {
-    printf("Line number: %lu\n", debug_info->line_num);
-  }
-
-  printf("Source line: %s\n", debug_info->line ? debug_info->line : "(null)");
-
-  printf("Assembly: %s\n",
-         debug_info->assembly ? debug_info->assembly : "(null)");
-
-  printf("Function: %s\n",
-         debug_info->function ? debug_info->function : "(null)");
 }

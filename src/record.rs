@@ -116,9 +116,6 @@ pub fn record(record: &Record, tmp_dir: &Path, runlog: &Path) -> Result<()> {
         );
         params.perf_frequency = record.perf_frequency;
     }
-    if record.profile_spe {
-
-    }
 
     PERFORMANCE_DATA.lock().unwrap().set_params(params);
     PERFORMANCE_DATA.lock().unwrap().init_collectors()?;

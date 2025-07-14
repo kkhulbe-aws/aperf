@@ -2,6 +2,10 @@
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
+/// @brief Reads the bmiss_map serialized file and stores it in memory
+/// @param filename Filename to read in
+/// @param out_count Count to populate for later iteration
+/// @return Pointer to malloc-ed file struct array
 bmiss_map_entry_t *process_bmiss_map_entries(const char *filename,
                                              uint64_t *out_count) {
   FILE *fp = fopen(filename, "r");
@@ -10,7 +14,7 @@ bmiss_map_entry_t *process_bmiss_map_entries(const char *filename,
   char *line = NULL;
   size_t len = 0;
   ssize_t read;
-  int entry_count = 0;
+  size_t entry_count = 0;
 
   size_t capacity = 64;
   bmiss_map_entry_t *entries = malloc(capacity * sizeof(bmiss_map_entry_t));
@@ -75,6 +79,10 @@ bmiss_map_entry_t *process_bmiss_map_entries(const char *filename,
   return entries;
 }
 
+/// @brief Reads the lat_map serialized file and stores it in memory
+/// @param filename Filename to read in
+/// @param out_count Count to populate for later iteration
+/// @return Pointer to malloc-ed file struct array
 lat_map_entry_t *process_lat_map_entries(const char *filename,
                                          uint64_t *out_count) {
   FILE *fp = fopen(filename, "r");
@@ -83,7 +91,7 @@ lat_map_entry_t *process_lat_map_entries(const char *filename,
   char *line = NULL;
   size_t len = 0;
   ssize_t read;
-  int entry_count = 0;
+  size_t entry_count = 0;
 
   size_t capacity = 64;
   lat_map_entry_t *entries = malloc(capacity * sizeof(lat_map_entry_t));
@@ -153,6 +161,10 @@ lat_map_entry_t *process_lat_map_entries(const char *filename,
   return entries;
 }
 
+/// @brief Helper function to set up a file pointer for the reports
+/// @param file_dir Directory to create file
+/// @param filename Name of file
+/// @return File pointer to file
 FILE *setup_report_file(char *file_dir, char *filename) {
   size_t path_len = strlen(file_dir) + strlen(filename) + 2;
   char *filepath = malloc(path_len);
@@ -164,6 +176,10 @@ FILE *setup_report_file(char *file_dir, char *filename) {
   return fp;
 }
 
+/// @brief Used for sorting bmiss entries
+/// @param a First entry to compare
+/// @param b Second entry to compare
+/// @return 1 if a > b, -1 if a < b, 0 if a = b
 int compare_bmiss_entries(const void *a, const void *b) {
   const bmiss_map_entry_t *entry_a = (const bmiss_map_entry_t *)a;
   const bmiss_map_entry_t *entry_b = (const bmiss_map_entry_t *)b;
@@ -172,6 +188,10 @@ int compare_bmiss_entries(const void *a, const void *b) {
   return entry_b->total_latency - entry_a->total_latency;
 }
 
+/// @brief Generates the bmiss report after process_bmiss_entries is called
+/// @param file_dir File dir to generate report in
+/// @param entries bmiss_map_t entries to populate report with
+/// @param count Number of entries
 void generate_bmiss_report(char *file_dir, bmiss_map_entry_t *entries,
                            uint64_t count) {
   FILE *fp = setup_report_file(file_dir, "hotline_bmiss_map.csv");
@@ -198,6 +218,10 @@ void generate_bmiss_report(char *file_dir, bmiss_map_entry_t *entries,
   fclose(fp);
 }
 
+/// @brief Comparison function for lat_map exec latencies
+/// @param a First entry to compare
+/// @param b Second entry to compre
+/// @return 1 if a > b, -1 if a < b, 0 if a = b
 int compare_lat_exec_entries(const void *a, const void *b) {
   const lat_map_entry_t *entry_a = (const lat_map_entry_t *)a;
   const lat_map_entry_t *entry_b = (const lat_map_entry_t *)b;
@@ -209,6 +233,10 @@ int compare_lat_exec_entries(const void *a, const void *b) {
           entry_b->translation_latency);
 }
 
+/// @brief Writes a single exec latency entry to the file
+/// @param fp File pointer of file to write to
+/// @param entry Pointer to entry information
+/// @param dinfo Debug information struct
 void print_exec_latency(FILE *fp, const lat_map_entry_t *entry,
                         const debug_info_t *dinfo) {
   fprintf(fp, "%.2f,%ld,%s,%s,%s,%s,%ld\n",
@@ -219,6 +247,10 @@ void print_exec_latency(FILE *fp, const lat_map_entry_t *entry,
           dinfo->assembly, entry->saturated);
 }
 
+/// @brief Comparison function for lat_map issue latencies
+/// @param a First entry to compare
+/// @param b Second entry to compre
+/// @return 1 if a > b, -1 if a < b, 0 if a = b
 int compare_lat_issue_entries(const void *a, const void *b) {
   const lat_map_entry_t *entry_a = (const lat_map_entry_t *)a;
   const lat_map_entry_t *entry_b = (const lat_map_entry_t *)b;
@@ -227,6 +259,10 @@ int compare_lat_issue_entries(const void *a, const void *b) {
   return entry_b->issue_latency - entry_a->issue_latency;
 }
 
+/// @brief Writes a single issue latency entry to the file
+/// @param fp File pointer of file to write to
+/// @param entry Pointer to entry information
+/// @param dinfo Debug information struct
 void print_issue_latency(FILE *fp, const lat_map_entry_t *entry,
                          const debug_info_t *dinfo) {
   fprintf(fp, "%.2f,%ld,%s,%s,%s,%s,%ld\n",
@@ -235,6 +271,10 @@ void print_issue_latency(FILE *fp, const lat_map_entry_t *entry,
           entry->saturated);
 }
 
+/// @brief Comparison function for lat_map translation latencies
+/// @param a First entry to compare
+/// @param b Second entry to compre
+/// @return 1 if a > b, -1 if a < b, 0 if a = b
 int compare_translation_issue_entries(const void *a, const void *b) {
   const lat_map_entry_t *entry_a = (const lat_map_entry_t *)a;
   const lat_map_entry_t *entry_b = (const lat_map_entry_t *)b;
@@ -243,6 +283,10 @@ int compare_translation_issue_entries(const void *a, const void *b) {
   return entry_b->translation_latency - entry_a->translation_latency;
 }
 
+/// @brief Writes a single translation latency entry to the file
+/// @param fp File pointer of file to write to
+/// @param entry Pointer to entry information
+/// @param dinfo Debug information struct
 void print_translation_latency(FILE *fp, const lat_map_entry_t *entry,
                                const debug_info_t *dinfo) {
   fprintf(fp, "%.2f,%ld,%s,%s,%s,%s,%ld\n",
@@ -251,6 +295,10 @@ void print_translation_latency(FILE *fp, const lat_map_entry_t *entry,
           entry->saturated);
 }
 
+/// @brief Comparison function for lat_map completion node latencies
+/// @param a First entry to compare
+/// @param b Second entry to compre
+/// @return 1 if a > b, -1 if a < b, 0 if a = b
 int compare_completion_node_issue_entries(const void *a, const void *b) {
   const lat_map_entry_t *entry_a = (const lat_map_entry_t *)a;
   const lat_map_entry_t *entry_b = (const lat_map_entry_t *)b;
@@ -259,6 +307,10 @@ int compare_completion_node_issue_entries(const void *a, const void *b) {
   return entry_b->total_latency - entry_a->total_latency;
 }
 
+/// @brief Writes a single completion node entry to the file
+/// @param fp File pointer of file to write to
+/// @param entry Pointer to entry information
+/// @param dinfo Debug information struct
 void print_completion_node(FILE *fp, const lat_map_entry_t *entry,
                            const debug_info_t *dinfo) {
   // Calculate totals for each level
@@ -323,6 +375,12 @@ void print_completion_node(FILE *fp, const lat_map_entry_t *entry,
           dinfo->line, dinfo->function, dinfo->assembly);
 }
 
+/// @brief Parametrized function to write a sub-report for lat_map
+/// @param entries Entries to write
+/// @param count Number of entries
+/// @param fp File pointer of file to write into
+/// @param compare_fn Comparison function for sorting entries
+/// @param print_fn Print function to write a single entry into `fp`
 void write_lat_map_sub_report(lat_map_entry_t *entries, uint64_t count,
                               FILE *fp,
                               int (*compare_fn)(const void *, const void *),
@@ -337,6 +395,10 @@ void write_lat_map_sub_report(lat_map_entry_t *entries, uint64_t count,
   }
 }
 
+/// @brief Calls write_lat_map_sub_report for each sub-view
+/// @param file_dir File directory to put reports into
+/// @param entries Entries to write
+/// @param count Number of entries
 void generate_lat_report(char *file_dir, lat_map_entry_t *entries,
                          uint64_t count) {
   FILE *exec_fp =
@@ -378,6 +440,11 @@ void generate_lat_report(char *file_dir, lat_map_entry_t *entries,
                            print_completion_node);
 }
 
+/// @brief Wrapper exposed for APerf to call. Complementary to
+/// hotline.c/serialize_maps. Expands the maps and builds individual views.
+/// @param argc C-like number of arguments
+/// @param argv C-like pointer to argument
+/// @return 0 on success, -1 otherwise
 int deserialize_maps(int argc, char *argv[]) {
   init_fname_binary_btree();
   parse_arguments(argc, argv);

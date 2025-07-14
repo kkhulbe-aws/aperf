@@ -8,6 +8,7 @@ struct btree *lat_map = NULL;
 /// @param udata Unused
 /// @return 1 if a > b, -1 if a < b, 0 if a = b
 int lat_map_compare(const void *a, const void *b, void *udata) {
+  (void)udata;
   const lat_map_entry_t *ua = a;
   const lat_map_entry_t *ub = b;
 

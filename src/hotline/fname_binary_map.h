@@ -59,6 +59,5 @@ void init_fname_binary_btree();
 binary_info_t *get_fname_binary_map_entry(char *filename);
 
 debug_info_t *get_debug_info(char *filename, uint64_t offset);
-void print_debug_info(const debug_info_t *debug_info);
 
 #endif  // DEBUG_INFO_UTILS_H_

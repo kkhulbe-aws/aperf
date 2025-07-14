@@ -11,6 +11,7 @@ const filename_entry_t *cached_entry[CACHE_DEPTH] = {NULL};
 /// @param udata Unused
 /// @return 1 if a > b, -1 if a < b, 0 if a = b
 int fname_compare(const void *a, const void *b, void *udata) {
+  (void)udata;
   const filename_entry_t *ua = a;
   const filename_entry_t *ub = b;
 
@@ -41,16 +42,20 @@ void insert_initial_mappings() {
     if (maps == NULL) continue;
 
     pid_t pid = atoi(pid_entry->d_name);
-    char line[1024];
+    char line[4096];
 
     while (fgets(line, sizeof(line), maps)) {
       unsigned long start, end;
       unsigned long offset;
       char perms[5];
-      char path[256] = "";
+      char path[4096] = "";
 
-      sscanf(line, "%lx-%lx %4s %lx %*x:%*x %*u %255s", &start, &end, perms,
-             &offset, path);
+      int res = sscanf(line, "%lx-%lx %4s %lx %*x:%*x %*u %4095s", &start, &end,
+                       perms, &offset, path);
+
+      // Some /proc mappings are anonymous, and do not have a file. Instead of
+      // crashing, we ignore them by ensuring path[0] is not null.
+      ASSERT(res >= 4, "Incorrectly read from /proc/.");
 
       if (path[0]) {
         size_t filename_len = strlen(path);
@@ -116,8 +121,6 @@ void insert_fname_entry(mmap2_record_t *record) {
   // and insert the new offset mapping into the vector
 
   entry = btree_get(fname_map, &key);
-  pid_virtual_map_entry_t **virtual_address_map = entry->virtual_address_map;
-  // char *filename = strdup(record->filename);
 
   pid_virtual_map_entry_t *virtual_entry =
       malloc(sizeof(pid_virtual_map_entry_t));
@@ -137,7 +140,7 @@ void free_filename_entry(filename_entry_t *entry_to_remove) {
   pid_virtual_map_entry_t **vmap = entry_to_remove->virtual_address_map;
   uint64_t vmap_size = vector_size(vmap);
 
-  for (int j = 0; j < vmap_size; j++) {
+  for (uint64_t j = 0; j < vmap_size; j++) {
     pid_virtual_map_entry_t *ventry = ((pid_virtual_map_entry_t **)vmap)[j];
     free(ventry);
   }

@@ -8,6 +8,7 @@ struct btree *bmiss_map = NULL;
 /// @param udata Unused
 /// @return 1 if a > b, -1 if a < b, 0 if equal
 int bmiss_map_compare(const void *a, const void *b, void *udata) {
+  (void)udata;
   const bmiss_map_entry_t *ua = a;
   const bmiss_map_entry_t *ub = b;
   if (ua->finode.ino > ub->finode.ino)

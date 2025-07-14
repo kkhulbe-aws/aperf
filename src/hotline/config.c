@@ -69,6 +69,13 @@ void parse_arguments(int argc, char *argv[]) {
         exit(EXIT_FAILURE);
     }
   }
+
+  ASSERT(profile_configuration.wakeup_period > 0,
+         "Wakeup period must be greater than 0");
+  ASSERT(profile_configuration.spe_sample_frequency > 0 &&
+             profile_configuration.spe_sample_frequency < MAX_SPE_SAMPLE_FREQ,
+         "SPE sample frequency must be greater than 0");
+  ASSERT(profile_configuration.timeout > 0, "Timeout must be greater than 0");
 }
 
 /// @brief computes the buffer sizes for the record and aux buffers
@@ -77,22 +84,25 @@ void parse_arguments(int argc, char *argv[]) {
 void get_perf_buffer_sizes(perf_buffer_size_t *buffer_sizes) {
   uint64_t page_sz = cpu_system_config.page_size;
   uint64_t num_pages_required =
-      8192;  // independent of sampling period, and hard to predict due to
-             // context switches, so we statically make it a large amount
+      4096 *
+      profile_configuration
+          .wakeup_period;  // independent of sampling period, and hard to
+                           // predict due to context switches, so we statically
+                           // make it a large amount profiling shows that this
+                           // causes an increase in CPU util at the begining of
+                           // the tool, during setup, but does not have much of
+                           // an impact later onwards. We instead make it only
+                           // proportional to the wakeup period
 
   uint64_t perf_record_buf_sz = num_pages_required * page_sz;
   uint64_t perf_aux_buf_sz = profile_configuration.spe_sample_frequency *
                              profile_configuration.wakeup_period *
                              sizeof(aux_record_raw_t) *
-                             64;  // overestimate factor of 64x
+                             8;  // overestimate factor of 4x
   perf_aux_buf_sz = (uint64_t)pow(
       2,
       ceil(log2((double)perf_aux_buf_sz)));  // round it to a power of 2, as
                                              // required by perf_event_open docs
-  if (perf_aux_buf_sz < 15)
-    perf_aux_buf_sz = 1 << 15;
-  else if (perf_aux_buf_sz > 1 << 30)
-    perf_aux_buf_sz = 1 << 30;
 
   uint64_t perf_aux_off = perf_record_buf_sz + page_sz;
 

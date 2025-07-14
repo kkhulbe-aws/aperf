@@ -17,18 +17,8 @@
 #include "perf_interface.h"
 #include "sys.h"
 
-#define UPDATE_HISTOGRAM(dst, src1, src2, level)                 \
-  do {                                                           \
-    dst.level.l1_bound_bin =                                     \
-        src1->level.l1_bound_bin + src2->level.l1_bound_bin;     \
-    dst.level.l2_bound_bin =                                     \
-        src1->level.l2_bound_bin + src2->level.l2_bound_bin;     \
-    dst.level.l3_bound_bin =                                     \
-        src1->level.l3_bound_bin + src2->level.l3_bound_bin;     \
-    dst.level.dram_bound_bin =                                   \
-        src1->level.dram_bound_bin + src2->level.dram_bound_bin; \
-  } while (0)
-
+/// @brief Struct to package latency binning information for completion node
+/// data report
 typedef struct completion_histogram {
   uint64_t l1_bound_bin;
   uint64_t l2_bound_bin;
@@ -36,6 +26,8 @@ typedef struct completion_histogram {
   uint64_t dram_bound_bin;
 } completion_histogram_t;
 
+/// @brief B-Tree structure for SPE latency information of load/store
+/// instructions
 typedef struct lat_map_entry {
   union {  // union allows data storing and report generation to use the same
            // parameters rather than having to redefine them each time.

@@ -15,6 +15,7 @@
 #include "finode_map.h"
 #include "perf_interface.h"
 
+/// @brief B-Tree struct definition for the SPE branch data.
 typedef struct bmiss_map_entry {
   union {  // union allows data storing and report generation to use the same
            // parameters rather than having to redefine them each time.

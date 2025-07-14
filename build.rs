@@ -63,8 +63,9 @@ fn main() -> Result<()> {
         ])
         .includes(["src/hotline"])
         .static_flag(true)
-        .flag("-w")
-        .opt_level(2)
+        .flag("-Werror")
+        .flag("-Wextra")
+        .opt_level(3)
         .compile("hotline");
 
     println!("cargo:rustc-link-lib=static=dw");

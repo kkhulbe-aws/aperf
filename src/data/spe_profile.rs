@@ -173,50 +173,54 @@ impl SPEProfileRaw {
 
 impl CollectData for SPEProfileRaw {
     fn prepare_data_collector(&mut self, params: &CollectorParams) -> Result<()> {
-        #[cfg(feature = "spe")]
-        {
-            let args = vec![
-                CString::new("hotline").unwrap(),
-                CString::new("--wakeup_period").unwrap(),
-                CString::new(params.interval.to_string()).unwrap(),
-                CString::new("--spe_sample_frequency").unwrap(),
-                CString::new(params.spe_sample_frequency.to_string()).unwrap(),
-                CString::new("--timeout").unwrap(),
-                CString::new((params.collection_time - 1).to_string()).unwrap(),
-                CString::new("--data_dir").unwrap(),
-                CString::new(params.data_dir.to_str().unwrap()).unwrap(),
-            ];
+    #[cfg(feature = "spe")]
+    {
+        let args = vec![
+            CString::new("hotline").unwrap(),
+            CString::new("--wakeup_period").unwrap(),
+            CString::new(params.interval.to_string()).unwrap(),
+            CString::new("--spe_sample_frequency").unwrap(),
+            CString::new(params.spe_sample_frequency.to_string()).unwrap(),
+            CString::new("--timeout").unwrap(),
+            CString::new(params.collection_time.to_string()).unwrap(),
+            CString::new("--data_dir").unwrap(),
+            CString::new(params.data_dir.to_str().unwrap()).unwrap(),
+        ];
 
+        let argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
 
-            let argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
+        unsafe {
+            match fork() {
+                -1 => {
+                    return Err(anyhow::anyhow!("Fork failed"));
+                }
+                0 => {
+                    // Child process
+                    if libc::setpgid(0, 0) == -1 {
+                        eprintln!("Failed to set process group");
+                        _exit(1);
+                    }
 
-            unsafe {
-                // fork the process
-                match fork() {
-                    -1 => {
-                        // fork failed
-                        return Err(anyhow::anyhow!("Fork failed"));
-                    }
-                    0 => {
-                        // child process
-                        if libc::setpgid(0, 0) == -1 {
-                            eprintln!("Failed to set process group");
-                            _exit(1);
-                        }
-                        let result =
-                            hotline(args.len() as c_int, argv.as_ptr() as *const *const i8);
-                        _exit(result);
-                    }
-                    pid => {
-                        // parent process
-                        self.pid = pid;
-                        return Ok(());
-                    }
+                    // Setup signal handlers
+                    let mut sigset = std::mem::MaybeUninit::uninit();
+                    libc::sigemptyset(sigset.as_mut_ptr());
+                    libc::sigaddset(sigset.as_mut_ptr(), libc::SIGTERM);
+                    libc::sigprocmask(libc::SIG_UNBLOCK, sigset.as_ptr(), std::ptr::null_mut());
+
+                    let result = hotline(args.len() as c_int, argv.as_ptr() as *const *const i8);
+                    _exit(result);
+                }
+                pid => {
+                    // Parent process
+                    self.pid = pid;
+                    return Ok(());
                 }
             }
         }
-        Ok(())
     }
+    Ok(())
+    }
+
 
     fn collect_data(&mut self, _params: &CollectorParams) -> Result<()> {
         Ok(())

@@ -154,7 +154,7 @@ void init_sessions() {
   sessions = malloc(sizeof(cpu_session_t) * cpu_system_config.num_cpus);
   memset(sessions, 0, sizeof(cpu_session_t) * cpu_system_config.num_cpus);
   ASSERT(sessions != NULL, "Failed to malloc sessions.");
-  for (int i = 0; i < cpu_system_config.num_cpus; i++) {
+  for (uint64_t i = 0; i < cpu_system_config.num_cpus; i++) {
     sessions[i].cpu = i;
     init_perf_events(&sessions[i]);
     configure_session_conv(&sessions[i]);
@@ -163,7 +163,7 @@ void init_sessions() {
 
 /// @brief Enables perf profiling across all CPUs
 void enable_perf_profiling() {
-  for (int i = 0; i < cpu_system_config.num_cpus; i++) {
+  for (uint64_t i = 0; i < cpu_system_config.num_cpus; i++) {
     toggle_pmu(&sessions[i], PERF_EVENT_IOC_ENABLE);
   }
 }
@@ -234,8 +234,7 @@ uint64_t get_perf_event_timestamp(struct perf_event_header *header) {
 /// @param session Active CPU session
 /// @param header Perf header for the record to process
 static inline void process_record_buffer_record(
-    cpu_session_t *session, struct perf_event_header *header,
-    uint64_t last_tail) {
+    struct perf_event_header *header) {
   switch (header->type) {
     case PERF_RECORD_MMAP2: {
       struct mmap2_record *mmap2_rec = (struct mmap2_record *)header;
@@ -337,10 +336,10 @@ void process_record_buffer_up_to_ts(cpu_session_t *session,
           (struct switch_cpu_wide_record *)header;
       session->active_pid =
           switch_rec->header.misc & PERF_RECORD_MISC_SWITCH_OUT
-              ? switch_rec->next_prev_pid
+              ? (pid_t)switch_rec->next_prev_pid
               : session->active_pid;
     } else {
-      process_record_buffer_record(session, header, data_tail);
+      process_record_buffer_record(header);
     }
 
     data_tail += header->size;
@@ -390,14 +389,18 @@ void process_aux_buffer(cpu_session_t *session) {
   }
 }
 
-/// @brief Serializes the lat_map and BMISS_MAP into files
+/// @brief Serializes the lat_map and bmiss_map into files
 void serialize_maps() {
-  printf("SERIALIZING\n");
-  char path[512];
+  sigset_t block_set, old_set;
+
+  // Block all signals during serialization
+  sigfillset(&block_set);
+  sigprocmask(SIG_BLOCK, &block_set, &old_set);
+
+  char path[4096];
   FILE *load_fp = NULL;
   FILE *branch_fp = NULL;
   struct btree_iter *iter = NULL;
-  bool success = false;
   bool ok;
 
   // open load file
@@ -484,6 +487,15 @@ void serialize_maps() {
     ASSERT(write_result >= 0, "Failed to write branch entry");
     ok = btree_iter_next(iter);
   }
+
+  fflush(load_fp);  // Flush buffers
+  fflush(branch_fp);
+
+  // Ensure data is written to disk
+  fsync(fileno(load_fp));
+  fsync(fileno(branch_fp));
+
+  sigprocmask(SIG_SETMASK, &old_set, NULL);
 }
 
 /// @brief Exposed wrapper function that APerf will call
@@ -499,13 +511,19 @@ void hotline(int argc, char *argv[]) {
   init_lat_map();
   init_bmiss_map();
 
+  // configure signal handling
+  struct sigaction sa = {.sa_handler = serialize_maps, .sa_flags = 0};
+  sigemptyset(&sa.sa_mask);
+
+  ASSERT(sigaction(SIGTERM, &sa, NULL) != -1, "Sigaction failed.");
+
   int iters =
       profile_configuration.timeout / profile_configuration.wakeup_period;
   enable_perf_profiling();
 
   for (int i = 0; i < iters; i++) {
     sleep(profile_configuration.wakeup_period);
-    for (int c = 0; c < cpu_system_config.num_cpus; c++) {
+    for (uint64_t c = 0; c < cpu_system_config.num_cpus; c++) {
       process_aux_buffer(&sessions[c]);
     }
   }

@@ -2,7 +2,13 @@
 
 struct btree *finode_map = NULL;
 
+/// @brief Comparison function for the file inode structures
+/// @param a First finode_map_entry to compare
+/// @param b Second finode_map_entry to compare
+/// @param udata Unused
+/// @return 1 if a > b, -1 if a < b, 0 otherwise
 int finode_compare(const void *a, const void *b, void *udata) {
+    (void)udata;
     const finode_t *fa = &((const finode_map_entry_t *)a)->finode;
     const finode_t *fb = &((const finode_map_entry_t *)b)->finode;
 
@@ -35,10 +41,6 @@ void insert_finode_entry(mmap2_record_t *record) {
     entry.finode.maj = record->maj;
     entry.finode.min = record->min;
     entry.finode.ino_generation = record->ino_generation;
-
-    size_t fixed_size = offsetof(struct mmap2_record, filename);
-    size_t filename_len =
-        ((struct perf_event_header *) record)->size - fixed_size - sizeof(struct sample_id);
 
     entry.filename = strdup(record->filename);
     btree_set(finode_map, &entry);

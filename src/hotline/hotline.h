@@ -10,6 +10,7 @@
 
 #include <fcntl.h>
 #include <math.h>
+#include <signal.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
@@ -31,6 +32,7 @@
 #define PERF_ARM_SPE_RAW_CONFIG \
   0x10001  // enable load collection, branch collection
 #define PERF_FORMAT_SPE 0x10
+
 #define AUX_WATERMARK \
   64  // watermark notification for PERF_SAMPLE_AUX record generation
 
