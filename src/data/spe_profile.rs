@@ -7,14 +7,15 @@ use crate::{PERFORMANCE_DATA, VISUALIZATION_DATA};
 use anyhow::Result;
 use csv_to_html;
 use ctor::ctor;
-use libc::{_exit, c_int, fork};
+use libc::{fork, _exit, setpgid, SIGTERM, killpg, waitpid};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::error::Error;
 use std::ffi::CString;
 use std::fs::File;
 use std::io::{Read, Write};
-use std::os::raw::c_char;
+use std::os::raw::{c_char, c_int};
+use std::panic;
 
 #[cfg(feature = "spe")]
 unsafe extern "C" {
@@ -25,110 +26,108 @@ unsafe extern "C" {
 pub static SPE_PROFILE_FILE_NAME: &str = "spe_profile";
 
 #[cfg(feature = "spe")]
-fn generate_html_tables(
-    params: &ReportParams,
-    completion_csv: &str,
-    exec_latency_csv: &str,
-    issue_latency_csv: &str,
-    translation_latency_csv: &str,
-    branch_csv: &str,
-) -> Result<(), Box<dyn Error>> {
-    // Read and convert CSV files to HTML
-    let completion_html = read_and_convert_csv(completion_csv)?;
-    let exec_latency_html = read_and_convert_csv(exec_latency_csv)?;
-    let issue_latency_html = read_and_convert_csv(issue_latency_csv)?;
-    let translation_latency_html = read_and_convert_csv(translation_latency_csv)?;
-    let branch_html = read_and_convert_csv(branch_csv)?;
+pub mod spe_reports {
+    use std::error::Error;
+    use std::fs::{File};
+    use std::io::{Read, Write};
+    use super::ReportParams;
 
-    // CSS for table styling
-    let table_style = r#"
-        <style>
-            table {
-                border-collapse: collapse;
-                width: 100%;
-                margin-bottom: 1em;
-            }
-            th, td {
-                border: 1px solid #ddd;
-                padding: 8px;
-                text-align: left;
-                white-space: nowrap; /* Prevent text wrapping */
-                overflow: hidden;
-                text-overflow: ellipsis;
-                max-width: 300px; /* Adjust this value as needed */
-            }
-            th {
-                background-color: #f2f2f2;
-                font-weight: bold;
-            }
-            tr:nth-child(even) {
-                background-color: #f9f9f9;
-            }
-            tr:hover {
-                background-color: #f5f5f5;
-            }
-            .table-container {
-                width: 100%;
-                overflow-x: auto; /* Add horizontal scroll for wide tables */
-            }
-            .toggle-button {
-                margin: 10px;
-                padding: 5px 10px;
-                cursor: pointer;
-            }
-            /* Specific column widths */
-            .assembly-column, .source-column {
-                min-width: 300px;
-                max-width: 500px;
-            }
-        </style>
-    "#;
+    struct ReportConfig<'a> {
+        title: &'a str,
+        filename: &'a str,
+    }
 
-    let completion_table_html =
-        generate_html("Completion Node View", table_style, &completion_html);
-    let exec_latency_table_html =
-        generate_html("Execution Latency View", table_style, &exec_latency_html);
-    let issue_latency_table_html =
-        generate_html("Issue Latency View", table_style, &issue_latency_html);
-    let translation_latency_table_html = generate_html(
-        "Translation Latency View",
-        table_style,
-        &translation_latency_html,
-    );
-    let branch_table_html = generate_html("Branch View", table_style, &branch_html);
+    const REPORT_CONFIGS: [ReportConfig; 5] = [
+        ReportConfig {
+            title: "Completion Node View",
+            filename: "hotline_lat_map_completion_report.csv",
+        },
+        ReportConfig {
+            title: "Execution Latency View",
+            filename: "hotline_lat_map_exec_report.csv",
+        },
+        ReportConfig {
+            title: "Issue Latency View",
+            filename: "hotline_lat_map_issue_report.csv",
+        },
+        ReportConfig {
+            title: "Translation Latency View",
+            filename: "hotline_lat_map_translation_report.csv",
+        },
+        ReportConfig {
+            title: "Branch View",
+            filename: "hotline_bmiss_map.csv",
+        },
+    ];
 
-    // Write the HTML files
-    write_html_file(params, "completion_node_view.html", &completion_table_html)?;
-    write_html_file(params, "exec_latency_view.html", &exec_latency_table_html)?;
-    write_html_file(params, "issue_latency_view.html", &issue_latency_table_html)?;
-    write_html_file(
-        params,
-        "translation_latency_view.html",
-        &translation_latency_table_html,
-    )?;
-    write_html_file(params, "branch_view.html", &branch_table_html)?;
+    pub fn generate_reports(params: &ReportParams) -> Result<(), Box<dyn Error>> {
+        let report_paths = get_report_paths(params);
+        generate_html_tables(params, &report_paths)?;
+        Ok(())
+    }
 
-    Ok(())
-}
+    fn get_report_paths(params: &ReportParams) -> Vec<(String, String)> {
+        REPORT_CONFIGS.iter()
+            .map(|config| (
+                config.title.to_string(),
+                format!("{}/data/{}", params.report_dir.display(), config.filename)
+            ))
+            .collect()
+    }
 
-#[cfg(feature = "spe")]
-fn read_and_convert_csv(csv_path: &str) -> Result<String, Box<dyn Error>> {
-    let mut file = File::open(csv_path)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
-    Ok(csv_to_html::convert(&content, &b',', &true))
-}
+    fn generate_html_tables(params: &ReportParams, report_paths: &[(String, String)]) -> Result<(), Box<dyn Error>> {
+        for (title, csv_path) in report_paths {
+            match generate_single_table(params, title, csv_path) {
+                Ok(_) => (),
+                Err(e) => eprintln!("Warning: Failed to generate table for {}: {}", title, e),
+            }
+        }
+        Ok(())
+    }
 
-#[cfg(feature = "spe")]
-fn generate_html(title: &str, table_style: &str, table_content: &str) -> String {
-    // Function to add class to specific columns
+    fn generate_single_table(params: &ReportParams, title: &str, csv_path: &str) -> Result<(), Box<dyn Error>> {
+        let html_content = read_and_convert_csv(csv_path)?;
+        let filename = format!("{}.html", title.to_lowercase().replace(" ", "_"));
+        write_html_file(params, &filename, &generate_html(title, &html_content))
+    }
+
+    fn read_and_convert_csv(csv_path: &str) -> Result<String, Box<dyn Error>> {
+        let mut content = String::new();
+        File::open(csv_path)?.read_to_string(&mut content)?;
+        Ok(csv_to_html::convert(&content, &b',', &true))
+    }
+
+    fn generate_html(title: &str, table_content: &str) -> String {
+        let modified_content = add_column_classes(table_content);
+        format!(
+            r#"<!DOCTYPE html>
+            <html lang="en">
+            <head>
+                <meta charset="UTF-8">
+                <meta name="viewport" content="width=device-width, initial-scale=1.0">
+                <title>{}</title>
+                <link rel="stylesheet" href="index.css">
+            </head>
+            <body>
+                <div id="{}-table">
+                    <h2>{}</h2>
+                    <div class="table-container">
+                        {}
+                    </div>
+                </div>
+            </body>
+            </html>"#,
+            title,
+            title.to_lowercase().replace(" ", "-"),
+            title,
+            modified_content
+        )
+    }
+
     fn add_column_classes(html: &str) -> String {
         let mut lines: Vec<String> = html.lines().map(String::from).collect();
         if let Some(header) = lines.first_mut() {
-            *header = header.replace(
-                "<th>Assembly</th>",
-                "<th class=\"assembly-column\">Assembly</th>",
-            );
+            *header = header.replace("<th>Assembly</th>", "<th class=\"assembly-column\">Assembly</th>");
             *header = header.replace("<th>Source</th>", "<th class=\"source-column\">Source</th>");
         }
         for line in lines.iter_mut().skip(1) {
@@ -137,31 +136,12 @@ fn generate_html(title: &str, table_style: &str, table_content: &str) -> String 
         lines.join("\n")
     }
 
-    format!(
-        r#"<div id="{}-table">
-            <h2>{}</h2>
-            {}
-            <div class="table-container">
-                {}
-            </div>
-        </div>"#,
-        title.to_lowercase().replace(" ", "-"),
-        title,
-        table_style,
-        add_column_classes(table_content)
-    )
-}
+    fn write_html_file(params: &ReportParams, filename: &str, content: &str) -> Result<(), Box<dyn Error>> {
+        let path = params.report_dir.join("data/js").join(filename);
+        File::create(path)?.write_all(content.as_bytes())?;
+        Ok(())
+    }
 
-#[cfg(feature = "spe")]
-fn write_html_file(
-    params: &ReportParams,
-    filename: &str,
-    content: &str,
-) -> Result<(), Box<dyn Error>> {
-    let path = params.report_dir.join("data/js").join(filename);
-    let mut file = File::create(path)?;
-    file.write_all(content.as_bytes())?;
-    Ok(())
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -176,9 +156,8 @@ impl SPEProfileRaw {
 }
 
 impl CollectData for SPEProfileRaw {
-    fn prepare_data_collector(&mut self, params: &CollectorParams) -> Result<()> {
     #[cfg(feature = "spe")]
-    {
+    fn prepare_data_collector(&mut self, params: &CollectorParams) -> Result<()> {
         let args = vec![
             CString::new("hotline").unwrap(),
             CString::new("--wakeup_period").unwrap(),
@@ -196,11 +175,12 @@ impl CollectData for SPEProfileRaw {
         unsafe {
             match fork() {
                 -1 => {
-                    return Err(anyhow::anyhow!("Fork failed"));
+                    eprintln!("Fork failed");
+                    Ok(()) // Return Ok even if fork fails
                 }
                 0 => {
                     // Child process
-                    if libc::setpgid(0, 0) == -1 {
+                    if setpgid(0, 0) == -1 {
                         eprintln!("Failed to set process group");
                         _exit(1);
                     }
@@ -208,7 +188,7 @@ impl CollectData for SPEProfileRaw {
                     // Setup signal handlers
                     let mut sigset = std::mem::MaybeUninit::uninit();
                     libc::sigemptyset(sigset.as_mut_ptr());
-                    libc::sigaddset(sigset.as_mut_ptr(), libc::SIGTERM);
+                    libc::sigaddset(sigset.as_mut_ptr(), SIGTERM);
                     libc::sigprocmask(libc::SIG_UNBLOCK, sigset.as_ptr(), std::ptr::null_mut());
 
                     let result = hotline(args.len() as c_int, argv.as_ptr() as *const *const i8);
@@ -217,12 +197,15 @@ impl CollectData for SPEProfileRaw {
                 pid => {
                     // Parent process
                     self.pid = pid;
-                    return Ok(());
+                    Ok(())
                 }
             }
         }
     }
-    Ok(())
+
+    #[cfg(not(feature = "spe"))]
+    fn prepare_data_collector(&mut self, _params: &CollectorParams) -> Result<()> {
+        Ok(())
     }
 
 
@@ -230,25 +213,38 @@ impl CollectData for SPEProfileRaw {
         Ok(())
     }
 
+    #[cfg(feature = "spe")]
     fn finish_data_collection(&mut self, _: &CollectorParams) -> Result<()> {
-        #[cfg(feature = "spe")]
-        {
-            unsafe {
-                // send SIGTERM to the process group
-                if libc::killpg(self.pid, libc::SIGTERM) == -1 {
-                    let err = std::io::Error::last_os_error();
-                    return Err(anyhow::anyhow!("Failed to kill process group: {}", err));
-                }
+        unsafe {
+            // Send SIGTERM to the process group
+            if killpg(self.pid, SIGTERM) == -1 {
+                let err = std::io::Error::last_os_error();
+                eprintln!("Warning: Failed to kill process group: {}", err);
+                // Continue despite error
+            }
 
-                // wait for the child process to finish
-                let mut status: c_int = 0;
-                if libc::waitpid(self.pid, &mut status, 0) == -1 {
+            // Wait for the child process to finish
+            let mut status: c_int = 0;
+            match waitpid(self.pid, &mut status, 0) {
+                -1 => {
                     let err = std::io::Error::last_os_error();
-                    return Err(anyhow::anyhow!("Failed to wait for child process: {}", err));
+                    eprintln!("Warning: Failed to wait for child process: {}", err);
+                }
+                _ => {
+                    if libc::WIFEXITED(status) {
+                        let exit_status = libc::WEXITSTATUS(status);
+                    } else if libc::WIFSIGNALED(status) {
+                        let term_sig = libc::WTERMSIG(status);
+                        eprintln!("Child process terminated by signal: {}", term_sig);
+                    }
                 }
             }
-            return Ok(());
         }
+    Ok(())
+    }
+
+    #[cfg(not(feature = "spe"))]
+    fn finish_data_collection(&mut self, _: &CollectorParams) -> Result<()> { 
         Ok(())
     }
 }
@@ -263,40 +259,58 @@ impl SPEProfile {
 }
 
 impl GetData for SPEProfile {
+
+    #[cfg(feature = "spe")]
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
-        #[cfg(feature = "spe")]
-        {
-            let args = vec![
-                CString::new("hotline").unwrap(),
-                CString::new("--data_dir").unwrap(),
-                CString::new(params.data_dir.to_str().unwrap()).unwrap(),
-                CString::new("--report_dir").unwrap(),
-                CString::new(format!("{}/data",params.report_dir.to_str().unwrap())).unwrap(),
-            ];
+        let args = vec![
+            CString::new("hotline").unwrap(),
+            CString::new("--data_dir").unwrap(),
+            CString::new(params.data_dir.to_str().unwrap()).unwrap(),
+            CString::new("--report_dir").unwrap(),
+            CString::new(format!("{}/data", params.report_dir.to_str().unwrap())).unwrap(),
+        ];
 
-            // Make sure to include null terminator for C
-            let mut argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
-            argv.push(std::ptr::null());
+        let argv: Vec<*const c_char> = args.iter().map(|arg| arg.as_ptr()).collect();
 
-            unsafe {
-                deserialize_maps((argv.len() - 1) as c_int, argv.as_ptr() as *mut *const i8);
+        // Run deserialize_maps in a child process
+        unsafe {
+            match fork() {
+                -1 => {
+                    eprintln!("Fork failed");
+                }
+                0 => {
+                    // Child process
+                    let result = panic::catch_unwind(panic::AssertUnwindSafe(|| {
+                        deserialize_maps(args.len() as c_int, argv.as_ptr() as *mut *const i8);
+                    }));
+                    match result {
+                        Ok(_) => _exit(0),
+                        Err(_) => _exit(1),
+                    }
+                }
+                pid => {
+                    // Parent process
+                    let mut status: c_int = 0;
+                    if waitpid(pid, &mut status, 0) == -1 {
+                        eprintln!("Failed to wait for deserialize_maps process");
+                    }
+                }
             }
         }
 
-        let _ = generate_html_tables(
-            &params,
-            &format!(
-                "{}/data/hotline_lat_map_completion_report.csv",
-                params.report_dir.display()
-            ),
-            &format!("{}/data/hotline_lat_map_exec_report.csv", params.report_dir.display()),
-            &format!("{}/data/hotline_lat_map_issue_report.csv", params.report_dir.display()),
-            &format!("{}/data/hotline_lat_map_translation_report.csv", params.report_dir.display()),
-            &format!("{}/data/hotline_bmiss_map.csv", params.report_dir.display()),
-        );
+        match spe_reports::generate_reports(&params) {
+            Ok(_) => (),
+            Err(e) => eprintln!("Warning: Failed to generate HTML tables: {}", e),
+        }
 
         Ok(vec![])
     }
+
+    #[cfg(not(feature = "spe"))]
+    fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
+        Ok(vec![])    
+    }
+
 
     fn get_calls(&mut self) -> Result<Vec<String>> {
         Ok(vec![])

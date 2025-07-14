@@ -201,6 +201,13 @@ void generate_bmiss_report(char *file_dir, bmiss_map_entry_t *entries,
           "Type,Count,Avg_Total_Lat,Avg_Issue_Lat,Not_Taken,Mispredicted,"
           "Saturated,Location,Line,Function,Assembly\n");
 
+  // Don't want to crash in case other reports have entries
+  if (entries == NULL || count == 0) {
+    fprintf(stderr, "No entries to process\n");
+    fclose(fp);
+    return;
+  }
+
   qsort(entries, count, sizeof(bmiss_map_entry_t), compare_bmiss_entries);
   for (size_t i = 0; i < MIN(count, profile_configuration.num_to_report); i++) {
     const bmiss_map_entry_t *entry = &entries[i];
@@ -427,6 +434,16 @@ void generate_lat_report(char *file_dir, lat_map_entry_t *entries,
       "L3 (%),L3 bins (% | % | % | %),DRAM (%),DRAM bins (% | % | % | %),"
       "Location,Line Number,Line,Function,Assembly\n",
       completion_fp);
+
+  // Don't want to crash in case other reports have entries
+  if (entries == NULL || count == 0) {
+    fprintf(stderr, "No entries to process\n");
+    fclose(exec_fp);
+    fclose(issue_fp);
+    fclose(translation_fp);
+    fclose(completion_fp);
+    return;
+  }
 
   write_lat_map_sub_report(entries, count, exec_fp, compare_lat_exec_entries,
                            print_exec_latency);

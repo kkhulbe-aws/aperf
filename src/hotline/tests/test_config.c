@@ -43,23 +43,6 @@ void test_parse_arguments_custom() {
     assert(strcmp(profile_configuration.report_dir, "/tmp/report") == 0);
 }
 
-void test_parse_arguments_short_options() {    
-    // Reset getopt's global state
-    optind = 1;  // Reset to 1 before parsing arguments
-    
-    char *argv[] = {"test_program", "-p", "3", "-s", "1500", "-t", "20", 
-                    "-d", "/custom/data", "-r", "/custom/report"};
-    int argc = 11;
-    
-    parse_arguments(argc, argv);
-    
-    assert(profile_configuration.wakeup_period == 3);
-    assert(profile_configuration.spe_sample_frequency == 1500);
-    assert(profile_configuration.timeout == 20);
-    assert(strcmp(profile_configuration.data_dir, "/custom/data") == 0);
-    assert(strcmp(profile_configuration.report_dir, "/custom/report") == 0);
-}
-
 void test_get_perf_buffer_sizes() {    
     // Set up configuration
     profile_configuration.wakeup_period = 2;
@@ -97,7 +80,6 @@ void test_config() {
     
     test_parse_arguments_defaults();
     test_parse_arguments_custom();
-    test_parse_arguments_short_options();
     test_get_perf_buffer_sizes();
     test_get_perf_buffer_sizes_different_config();
 }

@@ -126,7 +126,7 @@
 					<h2>Completion Node Bins: (L1 Bound, L2 Bound, L3 Bound, DRAM Bound) </h2>
 					<div class="toggle-buttons">
 						<button onclick="loadTable('completion_node')" class="active-button">Completion Node View</button>
-						<button onclick="loadTable('exec_latency')">Execution Latency View</button>
+						<button onclick="loadTable('execution_latency')">Execution Latency View</button>
 						<button onclick="loadTable('issue_latency')">Issue Latency View</button>
 						<button onclick="loadTable('translation_latency')">Translation Latency View</button>
 						<button onclick="loadTable('branch')">Branch View</button>
@@ -147,8 +147,8 @@
 					case 'completion_node':
 						fileName = 'completion_node_view.html';
 						break;
-					case 'exec_latency':
-						fileName = 'exec_latency_view.html';
+					case 'execution_latency':
+						fileName = 'execution_latency_view.html';
 						break;
 					case 'issue_latency':
 						fileName = 'issue_latency_view.html';

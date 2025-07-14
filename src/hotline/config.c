@@ -17,21 +17,19 @@ void parse_arguments(int argc, char *argv[]) {
   int option_index = 0;
   int c;
 
-  // Set defaults
+  // Reset getopt
+  optind = 1;
+
   profile_configuration.wakeup_period = PROFILE_DEFAULT_WAKEUP_PERIOD;
   profile_configuration.spe_sample_frequency = PROFILE_DEFAULT_SPE_SAMPLE_FREQ;
   profile_configuration.timeout = PROFILE_DEFAULT_TIMEOUT;
-  // Assuming you've added these to your configuration struct
-  profile_configuration.data_dir = strdup("./data");  // default data directory
-  profile_configuration.report_dir =
-      strdup("./report");  // default report directory
-
+  profile_configuration.data_dir = strdup("./data");
+  profile_configuration.report_dir = strdup("./report");
   profile_configuration.bmiss_map_filename = "hotline_bmiss_map.csv";
   profile_configuration.lat_map_filename = "hotline_lat_map.csv";
   profile_configuration.num_to_report = PROFILE_DEFAULT_NUM_REPORT;
 
-  while ((c = getopt_long(argc, argv, "p:s:t:d:r:n:", long_options,
-                          &option_index)) != -1) {
+  while ((c = getopt_long_only(argc, argv, "", long_options, &option_index)) != -1) {
     switch (c) {
       case 'p':
         profile_configuration.wakeup_period = atoi(optarg);
@@ -43,17 +41,18 @@ void parse_arguments(int argc, char *argv[]) {
         profile_configuration.timeout = atoi(optarg);
         break;
       case 'd':
-        free(profile_configuration.data_dir);  // Free default value
+        free(profile_configuration.data_dir);
         profile_configuration.data_dir = strdup(optarg);
         break;
       case 'r':
-        free(profile_configuration.report_dir);  // Free default value
+        free(profile_configuration.report_dir);
         profile_configuration.report_dir = strdup(optarg);
         break;
       case 'n':
         profile_configuration.num_to_report = atoi(optarg);
         break;
       case '?':
+        printf("Unknown option or missing argument\n");
         printf(
             "Usage: ./<BINARY> --wakeup_period X --spe_sample_frequency X "
             "--timeout X "
