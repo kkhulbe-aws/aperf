@@ -23,7 +23,7 @@ unsafe extern "C" {
     fn deserialize_maps(argc: c_int, argv: *const *const i8) -> c_int;
 }
 
-pub static SPE_PROFILE_FILE_NAME: &str = "spe_profile";
+pub static HOTLINE_FILE_NAME: &str = "spe_profile";
 
 #[cfg(feature = "spe")]
 pub mod spe_reports {
@@ -145,17 +145,17 @@ pub mod spe_reports {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SPEProfileRaw {
+pub struct HotlineRaw {
     pid: i32,
 }
 
-impl SPEProfileRaw {
+impl HotlineRaw {
     fn new() -> Self {
-        SPEProfileRaw { pid: 0 }
+        HotlineRaw { pid: 0 }
     }
 }
 
-impl CollectData for SPEProfileRaw {
+impl CollectData for HotlineRaw {
     #[cfg(feature = "spe")]
     fn prepare_data_collector(&mut self, params: &CollectorParams) -> Result<()> {
         let args = vec![
@@ -250,15 +250,15 @@ impl CollectData for SPEProfileRaw {
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct SPEProfile {}
+pub struct Hotline {}
 
-impl SPEProfile {
+impl Hotline {
     fn new() -> Self {
-        SPEProfile {}
+        Hotline {}
     }
 }
 
-impl GetData for SPEProfile {
+impl GetData for Hotline {
 
     #[cfg(feature = "spe")]
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
@@ -329,20 +329,20 @@ impl GetData for SPEProfile {
 #[ctor]
 #[cfg(feature = "spe")]
 fn init_spe_profile() {
-    let spe_profile_raw = SPEProfileRaw::new();
-    let file_name = SPE_PROFILE_FILE_NAME.to_string();
+    let hotline_raw = HotlineRaw::new();
+    let file_name = HOTLINE_FILE_NAME.to_string();
     let dt = DataType::new(
-        Data::SPEProfileRaw(spe_profile_raw.clone()),
+        Data::HotlineRaw(hotline_raw.clone()),
         file_name.clone(),
         false,
     );
-    let spe_perf_profile = SPEProfile::new();
+    let hotline_profile = Hotline::new();
     let js_file_name = file_name.clone() + ".js";
     let mut dv = DataVisualizer::new(
-        ProcessedData::SPEProfile(spe_perf_profile.clone()),
+        ProcessedData::Hotline(hotline_profile.clone()),
         file_name.clone(),
         js_file_name,
-        include_str!(concat!(env!("JS_DIR"), "/spe_profile.js")).to_string(),
+        include_str!(concat!(env!("JS_DIR"), "/hotline.js")).to_string(),
         file_name.clone(),
     );
     dv.has_custom_raw_data_parser();

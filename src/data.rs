@@ -10,7 +10,7 @@ pub mod kernel_config;
 pub mod meminfodata;
 pub mod netstat;
 pub mod perf_profile;
-pub mod spe_profile;
+pub mod hotline;
 pub mod perf_stat;
 pub mod processes;
 pub mod sysctldata;
@@ -36,7 +36,7 @@ use meminfodata::{MeminfoData, MeminfoDataRaw};
 use netstat::{Netstat, NetstatRaw};
 use nix::sys::{signal, signal::Signal};
 use perf_profile::{PerfProfile, PerfProfileRaw};
-use spe_profile::{SPEProfileRaw, SPEProfile};
+use hotline::{HotlineRaw, Hotline};
 use perf_stat::{PerfStat, PerfStatRaw};
 use processes::{Processes, ProcessesRaw};
 use serde::{Deserialize, Serialize};
@@ -321,7 +321,7 @@ data!(
     PerfProfileRaw,
     FlamegraphRaw,
     JavaProfileRaw,
-    SPEProfileRaw
+    HotlineRaw
 );
 
 processed_data!(
@@ -337,7 +337,7 @@ processed_data!(
     MeminfoData,
     Netstat,
     PerfProfile,
-    SPEProfile,
+    Hotline,
     Flamegraph,
     AperfStat,
     AperfRunlog,
