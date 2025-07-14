@@ -134,7 +134,7 @@ To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 
 `--profile-java` profile JVMs by PID or name using async-profiler (default profiles all JVMs)
 
-`--spe-sample-frequency` ARM SPE sampling period (Hz) **[hotline tool]**
+`--spe-sample-frequency` ARM SPE sampling period (Hz) **[hotline tool]** (default is 1Khz)
 
 `./aperf record -h`
 

@@ -239,11 +239,11 @@ int compare_lat_exec_entries(const void *a, const void *b) {
 /// @param dinfo Debug information struct
 void print_exec_latency(FILE *fp, const lat_map_entry_t *entry,
                         const debug_info_t *dinfo) {
-  fprintf(fp, "%.2f,%ld,%s,%s,%s,%s,%ld\n",
+  fprintf(fp, "%.2f,%ld,%s,%ld,%s,%s,%s,%ld\n",
           (double)(entry->total_latency - entry->issue_latency -
                    entry->translation_latency) /
               entry->retired,
-          entry->retired, dinfo->src_file, dinfo->line, dinfo->function,
+          entry->retired, dinfo->src_file, dinfo->line_num, dinfo->line, dinfo->function,
           dinfo->assembly, entry->saturated);
 }
 
@@ -265,9 +265,9 @@ int compare_lat_issue_entries(const void *a, const void *b) {
 /// @param dinfo Debug information struct
 void print_issue_latency(FILE *fp, const lat_map_entry_t *entry,
                          const debug_info_t *dinfo) {
-  fprintf(fp, "%.2f,%ld,%s,%s,%s,%s,%ld\n",
+  fprintf(fp, "%.2f,%ld,%s,%ld,%s,%s,%s,%ld\n",
           (double)(entry->issue_latency) / entry->retired, entry->retired,
-          dinfo->src_file, dinfo->line, dinfo->function, dinfo->assembly,
+          dinfo->src_file, dinfo->line_num, dinfo->line, dinfo->function, dinfo->assembly,
           entry->saturated);
 }
 
@@ -289,9 +289,9 @@ int compare_translation_issue_entries(const void *a, const void *b) {
 /// @param dinfo Debug information struct
 void print_translation_latency(FILE *fp, const lat_map_entry_t *entry,
                                const debug_info_t *dinfo) {
-  fprintf(fp, "%.2f,%ld,%s,%s,%s,%s,%ld\n",
+  fprintf(fp, "%.2f,%ld,%s,%ld,%s,%s,%s,%ld\n",
           (double)(entry->translation_latency) / entry->retired, entry->retired,
-          dinfo->src_file, dinfo->line, dinfo->function, dinfo->assembly,
+          dinfo->src_file, dinfo->line_num,dinfo->line, dinfo->function, dinfo->assembly,
           entry->saturated);
 }
 
@@ -367,11 +367,11 @@ void print_completion_node(FILE *fp, const lat_map_entry_t *entry,
   fprintf(fp,
           "%.2f,%.2f | %.2f | %.2f | %.2f,%.2f,%.2f | %.2f | %.2f | %.2f,"
           "%.2f,%.2f | %.2f | %.2f | %.2f,%.2f,%.2f | %.2f | %.2f | "
-          "%.2f,%s,%s,%s,%s\n",
+          "%.2f,%s,%ld,%s,%s,%s\n",
           l1_pct, l1_bins[0], l1_bins[1], l1_bins[2], l1_bins[3], l2_pct,
           l2_bins[0], l2_bins[1], l2_bins[2], l2_bins[3], l3_pct, l3_bins[0],
           l3_bins[1], l3_bins[2], l3_bins[3], dram_pct, dram_bins[0],
-          dram_bins[1], dram_bins[2], dram_bins[3], dinfo->src_file,
+          dram_bins[1], dram_bins[2], dram_bins[3], dinfo->src_file,dinfo->line_num,
           dinfo->line, dinfo->function, dinfo->assembly);
 }
 
@@ -411,21 +411,21 @@ void generate_lat_report(char *file_dir, lat_map_entry_t *entries,
       setup_report_file(file_dir, "hotline_lat_map_completion_report.csv");
 
   // write the headers in
-  fputs("Avg. Exec Latency,Count,Location,Line,Function,Assembly,Saturated\n",
+  fputs("Avg. Exec Latency,Count,Location,Line Number,Line,Function,Assembly,Saturated\n",
         exec_fp);
 
-  fputs("Avg. Issue Latency,Count,Location,Line,Function,Assembly,Saturated\n",
+  fputs("Avg. Issue Latency,Count,Location,Line Number,Line,Function,Assembly,Saturated\n",
         issue_fp);
 
   fputs(
       "Avg. Translation "
-      "Latency,Count,Location,Line,Function,Assembly,Saturated\n",
+      "Latency,Count,Location,Line Number,Line,Function,Assembly,Saturated\n",
       translation_fp);
 
   fputs(
       "L1 (%),L1 bins (% | % | % | %),L2 (%),L2 bins (% | % | % | %),"
       "L3 (%),L3 bins (% | % | % | %),DRAM (%),DRAM bins (% | % | % | %),"
-      "Location,Line,Function,Assembly\n",
+      "Location,Line Number,Line,Function,Assembly\n",
       completion_fp);
 
   write_lat_map_sub_report(entries, count, exec_fp, compare_lat_exec_entries,

@@ -282,7 +282,7 @@ impl GetData for SPEProfile {
         let _ = generate_html_tables(
             &params,
             &format!(
-                "{}/data/hotline_lat_map_exec_report.csv",
+                "{}/data/hotline_lat_map_completion_report.csv",
                 params.report_dir.display()
             ),
             &format!("{}/data/hotline_lat_map_exec_report.csv", params.report_dir.display()),
