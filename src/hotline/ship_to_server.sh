@@ -1,1 +1,0 @@
-scp -i "~/kkhulbe-keypair.pem" ./a.out ubuntu@3.85.162.189:~/a.out

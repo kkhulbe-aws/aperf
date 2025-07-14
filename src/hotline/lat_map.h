@@ -44,7 +44,7 @@ typedef struct lat_map_entry {
     struct {
       completion_histogram_t l1, l2, l3, dram;
     };
-    completion_histogram_t histograms[4];  // Array access option
+    completion_histogram_t histograms[4];  // array access option
   };
 } lat_map_entry_t;
 
