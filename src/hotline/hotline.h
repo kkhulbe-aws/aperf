@@ -1,6 +1,6 @@
 /**
  * @file hotline.h
- * @brief
+ * @brief Main event loop for Hotline. Sets up Perf PMUs, mmaps buffers, and begins collection/serialization.
  * @author Kaustubh Khulbe
  * @ingroup Graviton Software
  */

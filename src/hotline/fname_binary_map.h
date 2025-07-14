@@ -1,3 +1,10 @@
+/**
+ * @file fname_binary_map.h
+ * @brief In memory cache for filenames to binary debug info structs.
+ * @author Kaustubh Khulbe
+ * @ingroup Graviton Software
+ */
+
 #ifndef DEBUG_INFO_UTILS_H_
 #define DEBUG_INFO_UTILS_H_
 
