@@ -8,6 +8,12 @@ use std::path::{Path, PathBuf};
 use std::{fs, panic};
 use tar::Archive;
 use tempfile::TempDir;
+use libc::c_int;
+
+#[cfg(feature = "spe")]
+unsafe extern "C" {
+    fn test_all() -> c_int;
+}
 
 fn run_test<T>(test_func: T)
 where
@@ -24,6 +30,13 @@ where
     if let Err(e) = result {
         panic::resume_unwind(e);
     }
+}
+
+#[test]
+#[serial]
+#[cfg(feature = "spe")]
+fn test_hotline() {
+    unsafe { test_all(); }
 }
 
 #[test]
@@ -63,6 +76,7 @@ fn record_with_name(run: String, tempdir: &Path, aperf_tmp: &Path) -> Result<Str
         perf_frequency: 99,
         profile_java: None,
         pmu_config: None,
+        spe_sample_frequency: 1000
     };
     let runlog = tempdir.join(APERF_RUNLOG);
     fs::File::create(&runlog).unwrap();

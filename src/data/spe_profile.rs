@@ -24,6 +24,7 @@ unsafe extern "C" {
 
 pub static SPE_PROFILE_FILE_NAME: &str = "spe_profile";
 
+#[cfg(feature = "spe")]
 fn generate_html_tables(
     params: &ReportParams,
     completion_csv: &str,
@@ -110,6 +111,7 @@ fn generate_html_tables(
     Ok(())
 }
 
+#[cfg(feature = "spe")]
 fn read_and_convert_csv(csv_path: &str) -> Result<String, Box<dyn Error>> {
     let mut file = File::open(csv_path)?;
     let mut content = String::new();
@@ -117,6 +119,7 @@ fn read_and_convert_csv(csv_path: &str) -> Result<String, Box<dyn Error>> {
     Ok(csv_to_html::convert(&content, &b',', &true))
 }
 
+#[cfg(feature = "spe")]
 fn generate_html(title: &str, table_style: &str, table_content: &str) -> String {
     // Function to add class to specific columns
     fn add_column_classes(html: &str) -> String {
@@ -149,6 +152,7 @@ fn generate_html(title: &str, table_style: &str, table_content: &str) -> String 
     )
 }
 
+#[cfg(feature = "spe")]
 fn write_html_file(
     params: &ReportParams,
     filename: &str,

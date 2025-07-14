@@ -103,6 +103,7 @@ void init_fname_map() {
 /// @brief Inserts a new MMAP2 record into FNAME_MAP.
 /// @param record Record to insert
 void insert_fname_entry(mmap2_record_t *record) {
+  if (!record) return;
   filename_entry_t key = {.pid = record->pid};
 
   const filename_entry_t *entry = btree_get(fname_map, &key);
@@ -114,7 +115,6 @@ void insert_fname_entry(mmap2_record_t *record) {
     new_entry.pid = record->pid;
 
     new_entry.virtual_address_map = vector_create();
-
     btree_set(fname_map, &new_entry);
   }
 
@@ -201,6 +201,7 @@ void remove_fname_entry(pid_t pid) {
 /// @return -1 on failure to map, 0 on success
 int va_to_file_offset(uint64_t pc, pid_t pid, finode_t *finode,
                       uint64_t *offset) {
+  if (!finode || !offset) return -1;
   const filename_entry_t *entry = get_filename_cached_entry(pid);
   if (entry == NULL)
     entry = btree_get(fname_map, &(filename_entry_t){.pid = pid});

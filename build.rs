@@ -60,6 +60,13 @@ fn main() -> Result<()> {
             "src/hotline/report.c",
             "src/hotline/sys.c",
             "src/hotline/vec.c",
+            "src/hotline/tests/test_bmiss_map.c",
+            "src/hotline/tests/test_config.c",
+            "src/hotline/tests/test_finode_map.c",
+            "src/hotline/tests/test_fname_binary_map.c",
+            "src/hotline/tests/test_fname_map.c",
+            "src/hotline/tests/test_lat_map.c",
+            "src/hotline/tests/test.c"
         ])
         .includes(["src/hotline"])
         .static_flag(true)

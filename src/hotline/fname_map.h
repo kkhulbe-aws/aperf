@@ -57,6 +57,8 @@ void remove_fname_entry(pid_t pid);
 int va_to_file_offset(uint64_t pc, pid_t pid, finode_t *finode,
                       uint64_t *offset);
 
+int fname_compare(const void *a, const void *b, void *udata); // exposed for testing
+
 /// @brief Exposed B-Tree structure for all file mappings
 extern struct btree *fname_map;
 

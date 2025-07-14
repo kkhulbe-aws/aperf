@@ -58,6 +58,7 @@ static inline void update_histogram(completion_histogram_t *dst,
 /// @brief Inserts a `lat_map_entry_t` into the lat_map
 /// @param entry_to_insert Entry to insert
 void insert_lat_map_entry(lat_map_entry_t *entry_to_insert) {
+  if (!entry_to_insert) return;
   lat_map_entry_t key = {.finode = entry_to_insert->finode,
                          .offset = entry_to_insert->offset};
 
@@ -103,6 +104,7 @@ void insert_lat_map_entry(lat_map_entry_t *entry_to_insert) {
 /// @param offset File offset to associate, decoded from `pc_to_file_offset`
 void parse_lat_map_entry(aux_record_raw_t *record, lat_map_entry_t *entry,
                          finode_t *finode, uint64_t offset) {
+  if (!record || !entry || !finode) return;
   entry->saturated = (record->issue_lat == AUX_PACKET_SATURATED) ? 1 : 0;
   entry->retired = (record->events_packet & AUX_EVENT_RETIRED) ? 1 : 0;
   entry->finode.ino = finode->ino;

@@ -11,7 +11,7 @@ void parse_arguments(int argc, char *argv[]) {
       {"timeout", required_argument, 0, 't'},
       {"data_dir", required_argument, 0, 'd'},
       {"report_dir", required_argument, 0, 'r'},
-      {"num_to_report", required_argument, 0, 'r'},
+      {"num_to_report", required_argument, 0, 'n'},
       {0, 0, 0, 0}};
 
   int option_index = 0;

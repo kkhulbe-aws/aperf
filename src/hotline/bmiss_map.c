@@ -46,6 +46,8 @@ void init_bmiss_map() {
 /// @brief Inserts a bmiss_map_entry_t into the BMISS_MAP
 /// @param entry_to_insert Entry to insert
 void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
+  if (!entry_to_insert) return;
+
   bmiss_map_entry_t key = {.finode = entry_to_insert->finode,
                            .offset = entry_to_insert->offset};
 
@@ -87,6 +89,8 @@ void insert_bmiss_map(bmiss_map_entry_t *entry_to_insert) {
 /// `pc_to_file_offset`
 void parse_bmiss_map_entry(aux_record_raw_t *record, bmiss_map_entry_t *entry,
                            finode_t *finode, uint64_t offset) {
+  if (!entry || !record || !finode ) return;
+
   entry->saturated = (record->issue_lat == AUX_PACKET_SATURATED) ? 1 : 0;
   entry->retired = (record->events_packet & AUX_EVENT_RETIRED) ? 1 : 0;
   entry->finode.ino = finode->ino;

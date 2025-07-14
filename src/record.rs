@@ -31,10 +31,6 @@ pub struct Record {
     #[clap(long, value_parser, default_missing_value = Some("jps"), value_names = &["PID/Name>,<PID/Name>,...,<PID/Name"], num_args = 0..=1)]
     pub profile_java: Option<String>,
 
-    /// Profile using SPE and hotline.
-    #[clap(long, value_parser, default_value_t = true)]
-    pub profile_spe: bool,
-
     /// Custom PMU config file to use.
     #[clap(long, value_parser)]
     pub pmu_config: Option<String>,

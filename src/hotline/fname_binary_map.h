@@ -67,4 +67,8 @@ binary_info_t *get_fname_binary_map_entry(char *filename);
 
 debug_info_t *get_debug_info(char *filename, uint64_t offset);
 
+char *get_absolute_source_path(const char *binary_path,
+                               const char *source_path);
+char *get_line_at_line_number(const char *filename, int target_line);
+
 #endif  // DEBUG_INFO_UTILS_H_
