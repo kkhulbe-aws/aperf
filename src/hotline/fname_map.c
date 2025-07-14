@@ -88,6 +88,7 @@ void insert_initial_mappings() {
         free(record);
       }
     }
+    fclose(maps);
   }
 }
 

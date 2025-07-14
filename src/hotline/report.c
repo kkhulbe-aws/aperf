@@ -438,6 +438,11 @@ void generate_lat_report(char *file_dir, lat_map_entry_t *entries,
   write_lat_map_sub_report(entries, count, completion_fp,
                            compare_completion_node_issue_entries,
                            print_completion_node);
+                           
+  fclose(exec_fp);
+  fclose(issue_fp);
+  fclose(translation_fp);
+  fclose(completion_fp);
 }
 
 /// @brief Wrapper exposed for APerf to call. Complementary to

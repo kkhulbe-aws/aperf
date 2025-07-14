@@ -495,6 +495,9 @@ void serialize_maps() {
   fsync(fileno(load_fp));
   fsync(fileno(branch_fp));
 
+  fclose(load_fp);
+  fclose(branch_fp);
+
   sigprocmask(SIG_SETMASK, &old_set, NULL);
 }
 
