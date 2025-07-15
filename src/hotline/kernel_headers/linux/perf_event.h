@@ -15,9 +15,9 @@
 #ifndef _LINUX_PERF_EVENT_H
 #define _LINUX_PERF_EVENT_H
 
-#include "types.h"
-#include "ioctl.h"
-#include "../asm/byteorder.h"
+#include <linux/types.h>
+#include <linux/ioctl.h>
+#include <asm/byteorder.h>
 
 /*
  * User-space ABI bits:
