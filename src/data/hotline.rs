@@ -9,10 +9,7 @@ use ctor::ctor;
 use libc::{_exit, fork, killpg, setpgid, waitpid, SIGTERM};
 use serde::{Deserialize, Serialize};
 use std::env;
-use std::error::Error;
 use std::ffi::CString;
-use std::fs::File;
-use std::io::{Read, Write};
 use std::os::raw::{c_char, c_int};
 use std::panic;
 
