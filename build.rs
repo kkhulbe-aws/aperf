@@ -45,7 +45,10 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    println!("cargo:rustc-flag=-I{}/kernel_headers", env!("CARGO_MANIFEST_DIR"));
+    println!(
+        "cargo:rustc-flag=-I{}/kernel_headers",
+        env!("CARGO_MANIFEST_DIR")
+    );
 
     #[cfg(feature = "spe")]
     {
