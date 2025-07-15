@@ -59,7 +59,6 @@ fn collect_static_data() -> Result<()> {
 }
 
 pub fn record(record: &Record, tmp_dir: &Path, runlog: &Path) -> Result<()> {
-
     println!("runlog: {:?}", runlog);
 
     let mut run_name = String::new();

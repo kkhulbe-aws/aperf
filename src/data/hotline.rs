@@ -5,9 +5,8 @@ use crate::utils::DataMetrics;
 use crate::visualizer::{DataVisualizer, GetData, ReportParams};
 use crate::{PERFORMANCE_DATA, VISUALIZATION_DATA};
 use anyhow::Result;
-use csv_to_html;
 use ctor::ctor;
-use libc::{fork, _exit, setpgid, SIGTERM, killpg, waitpid};
+use libc::{_exit, fork, killpg, setpgid, waitpid, SIGTERM};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::error::Error;
@@ -27,10 +26,10 @@ pub static HOTLINE_FILE_NAME: &str = "spe_profile";
 
 #[cfg(feature = "spe")]
 pub mod spe_reports {
-    use std::error::Error;
-    use std::fs::{File};
-    use std::io::{Read, Write};
     use super::ReportParams;
+    use std::error::Error;
+    use std::fs::File;
+    use std::io::{Read, Write};
 
     struct ReportConfig<'a> {
         title: &'a str,
@@ -67,15 +66,21 @@ pub mod spe_reports {
     }
 
     fn get_report_paths(params: &ReportParams) -> Vec<(String, String)> {
-        REPORT_CONFIGS.iter()
-            .map(|config| (
-                config.title.to_string(),
-                format!("{}/data/{}", params.report_dir.display(), config.filename)
-            ))
+        REPORT_CONFIGS
+            .iter()
+            .map(|config| {
+                (
+                    config.title.to_string(),
+                    format!("{}/data/{}", params.report_dir.display(), config.filename),
+                )
+            })
             .collect()
     }
 
-    fn generate_html_tables(params: &ReportParams, report_paths: &[(String, String)]) -> Result<(), Box<dyn Error>> {
+    fn generate_html_tables(
+        params: &ReportParams,
+        report_paths: &[(String, String)],
+    ) -> Result<(), Box<dyn Error>> {
         for (title, csv_path) in report_paths {
             match generate_single_table(params, title, csv_path) {
                 Ok(_) => (),
@@ -85,7 +90,11 @@ pub mod spe_reports {
         Ok(())
     }
 
-    fn generate_single_table(params: &ReportParams, title: &str, csv_path: &str) -> Result<(), Box<dyn Error>> {
+    fn generate_single_table(
+        params: &ReportParams,
+        title: &str,
+        csv_path: &str,
+    ) -> Result<(), Box<dyn Error>> {
         let html_content = read_and_convert_csv(csv_path)?;
         let filename = format!("{}.html", title.to_lowercase().replace(" ", "_"));
         write_html_file(params, &filename, &generate_html(title, &html_content))
@@ -127,7 +136,10 @@ pub mod spe_reports {
     fn add_column_classes(html: &str) -> String {
         let mut lines: Vec<String> = html.lines().map(String::from).collect();
         if let Some(header) = lines.first_mut() {
-            *header = header.replace("<th>Assembly</th>", "<th class=\"assembly-column\">Assembly</th>");
+            *header = header.replace(
+                "<th>Assembly</th>",
+                "<th class=\"assembly-column\">Assembly</th>",
+            );
             *header = header.replace("<th>Source</th>", "<th class=\"source-column\">Source</th>");
         }
         for line in lines.iter_mut().skip(1) {
@@ -136,12 +148,15 @@ pub mod spe_reports {
         lines.join("\n")
     }
 
-    fn write_html_file(params: &ReportParams, filename: &str, content: &str) -> Result<(), Box<dyn Error>> {
+    fn write_html_file(
+        params: &ReportParams,
+        filename: &str,
+        content: &str,
+    ) -> Result<(), Box<dyn Error>> {
         let path = params.report_dir.join("data/js").join(filename);
         File::create(path)?.write_all(content.as_bytes())?;
         Ok(())
     }
-
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -208,7 +223,6 @@ impl CollectData for HotlineRaw {
         Ok(())
     }
 
-
     fn collect_data(&mut self, _params: &CollectorParams) -> Result<()> {
         Ok(())
     }
@@ -229,16 +243,14 @@ impl CollectData for HotlineRaw {
                     let err = std::io::Error::last_os_error();
                     eprintln!("Warning: Failed to wait for child process: {}", err);
                 }
-                _ => {
-                     
-                }
+                _ => {}
             }
         }
-    Ok(())
+        Ok(())
     }
 
     #[cfg(not(feature = "spe"))]
-    fn finish_data_collection(&mut self, _: &CollectorParams) -> Result<()> { 
+    fn finish_data_collection(&mut self, _: &CollectorParams) -> Result<()> {
         Ok(())
     }
 }
@@ -253,7 +265,6 @@ impl Hotline {
 }
 
 impl GetData for Hotline {
-
     #[cfg(feature = "spe")]
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
         let args = vec![
@@ -304,9 +315,8 @@ impl GetData for Hotline {
 
     #[cfg(not(feature = "spe"))]
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
-        Ok(vec![])    
+        Ok(vec![])
     }
-
 
     fn get_calls(&mut self) -> Result<Vec<String>> {
         Ok(vec![])

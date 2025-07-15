@@ -9,7 +9,7 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=package.json");
     println!("cargo:rerun-if-changed=package-lock.json");
     println!("cargo:rustc-link-search=native=/usr/lib");
-    println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");  // for ARM64
+    println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu"); // for ARM64
 
     println!("cargo:rerun-if-changed=package.json");
     println!("cargo:rerun-if-changed=package-lock.json");
@@ -47,44 +47,44 @@ fn main() -> Result<()> {
 
     #[cfg(feature = "spe")]
     {
-    cc::Build::new()
-        .files([
-            "src/hotline/bmiss_map.c",
-            "src/hotline/btree.c",
-            "src/hotline/config.c",
-            "src/hotline/finode_map.c",
-            "src/hotline/fname_binary_map.c",
-            "src/hotline/fname_map.c",
-            "src/hotline/hotline.c",
-            "src/hotline/lat_map.c",
-            "src/hotline/report.c",
-            "src/hotline/sys.c",
-            "src/hotline/vec.c",
-            "src/hotline/tests/test_bmiss_map.c",
-            "src/hotline/tests/test_config.c",
-            "src/hotline/tests/test_finode_map.c",
-            "src/hotline/tests/test_fname_binary_map.c",
-            "src/hotline/tests/test_fname_map.c",
-            "src/hotline/tests/test_lat_map.c",
-            "src/hotline/tests/test.c"
-        ])
-        .includes(["src/hotline"])
-        .static_flag(true)
-        .flag("-Werror")
-        .flag("-Wextra")
-        .opt_level(3)
-        .compile("hotline");
+        cc::Build::new()
+            .files([
+                "src/hotline/bmiss_map.c",
+                "src/hotline/btree.c",
+                "src/hotline/config.c",
+                "src/hotline/finode_map.c",
+                "src/hotline/fname_binary_map.c",
+                "src/hotline/fname_map.c",
+                "src/hotline/hotline.c",
+                "src/hotline/lat_map.c",
+                "src/hotline/report.c",
+                "src/hotline/sys.c",
+                "src/hotline/vec.c",
+                "src/hotline/tests/test_bmiss_map.c",
+                "src/hotline/tests/test_config.c",
+                "src/hotline/tests/test_finode_map.c",
+                "src/hotline/tests/test_fname_binary_map.c",
+                "src/hotline/tests/test_fname_map.c",
+                "src/hotline/tests/test_lat_map.c",
+                "src/hotline/tests/test.c",
+            ])
+            .includes(["src/hotline"])
+            .static_flag(true)
+            .flag("-Werror")
+            .flag("-Wextra")
+            .opt_level(3)
+            .compile("hotline");
 
-    println!("cargo:rustc-link-lib=static=dw");
-    println!("cargo:rustc-link-lib=static=elf");
-    println!("cargo:rustc-link-lib=static=capstone");
-    println!("cargo:rustc-link-lib=static=z");
-    println!("cargo:rustc-link-lib=static=lzma");
-    println!("cargo:rustc-link-lib=static=bz2");
-    println!("cargo:rustc-link-lib=static=zstd");
-    println!("cargo:rustc-link-lib=dylib=dl");
-    println!("cargo:rustc-link-lib=dylib=pthread");
-    println!("Building with SPE support.");
+        println!("cargo:rustc-link-lib=static=dw");
+        println!("cargo:rustc-link-lib=static=elf");
+        println!("cargo:rustc-link-lib=static=capstone");
+        println!("cargo:rustc-link-lib=static=z");
+        println!("cargo:rustc-link-lib=static=lzma");
+        println!("cargo:rustc-link-lib=static=bz2");
+        println!("cargo:rustc-link-lib=static=zstd");
+        println!("cargo:rustc-link-lib=dylib=dl");
+        println!("cargo:rustc-link-lib=dylib=pthread");
+        println!("Building with SPE support.");
     }
     Ok(())
 }

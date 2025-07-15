@@ -4,13 +4,13 @@ pub mod constants;
 pub mod cpu_utilization;
 pub mod diskstats;
 pub mod flamegraphs;
+pub mod hotline;
 pub mod interrupts;
 pub mod java_profile;
 pub mod kernel_config;
 pub mod meminfodata;
 pub mod netstat;
 pub mod perf_profile;
-pub mod hotline;
 pub mod perf_stat;
 pub mod processes;
 pub mod sysctldata;
@@ -28,6 +28,7 @@ use chrono::prelude::*;
 use cpu_utilization::{CpuUtilization, CpuUtilizationRaw};
 use diskstats::{Diskstats, DiskstatsRaw};
 use flamegraphs::{Flamegraph, FlamegraphRaw};
+use hotline::{Hotline, HotlineRaw};
 use interrupts::{InterruptData, InterruptDataRaw};
 use java_profile::{JavaProfile, JavaProfileRaw};
 use kernel_config::KernelConfig;
@@ -36,7 +37,6 @@ use meminfodata::{MeminfoData, MeminfoDataRaw};
 use netstat::{Netstat, NetstatRaw};
 use nix::sys::{signal, signal::Signal};
 use perf_profile::{PerfProfile, PerfProfileRaw};
-use hotline::{HotlineRaw, Hotline};
 use perf_stat::{PerfStat, PerfStatRaw};
 use processes::{Processes, ProcessesRaw};
 use serde::{Deserialize, Serialize};
@@ -62,7 +62,7 @@ pub struct CollectorParams {
     pub pmu_config: Option<PathBuf>,
     pub perf_frequency: u32,
     pub spe_sample_frequency: u32,
-    pub interval: u64
+    pub interval: u64,
 }
 
 impl CollectorParams {
@@ -80,7 +80,7 @@ impl CollectorParams {
             pmu_config: Option::None,
             perf_frequency: 99,
             spe_sample_frequency: 1000,
-            interval: 1
+            interval: 1,
         }
     }
 }
