@@ -72,6 +72,7 @@ uint64_t get_num_cpus() { return sysconf(_SC_NPROCESSORS_ONLN); }
 void get_latency_bins(completion_latency_limits_t *limits) {
   uint64_t part = get_cpu_part();
 
+  // These latencies were gathered from lat_mem_rd
   switch (part) {
     case CPU_PART_ID_GRV3:
       limits->l1_max_cycles = 5;   // 1.8 ns

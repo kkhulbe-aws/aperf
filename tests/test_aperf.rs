@@ -11,7 +11,7 @@ use tempfile::TempDir;
 use libc::c_int;
 
 #[cfg(feature = "spe")]
-unsafe extern "C" {
+extern "C" {
     fn test_all() -> c_int;
 }
 
