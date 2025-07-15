@@ -40,6 +40,16 @@ jobs:
         run: sudo apt install -y build-essential
       - name: Install musl
         run: sudo apt install -y musl-tools
+      - name: Install SPE libraries
+        run: |
+          sudo apt install -y \
+            libdw-dev \
+            libelf-dev \
+            libcapstone-dev \
+            zlib1g-dev \
+            liblzma-dev \
+            libbz2-dev \
+            libzstd-dev
 
       # Tests and static analysis
       - name: Set perf_event_paranoid to 0

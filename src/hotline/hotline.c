@@ -310,7 +310,9 @@ void process_record_buffer_up_to_ts(cpu_session_t *session,
   // "On SMP-capable platforms, after reading the data_head value, user space
   // should issue an rmb()."
   // https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+#ifdef __aarch64__
   asm volatile("dmb ishld" ::: "memory");  // memory barrier for reading
+#endif
 
   while (data_tail < data_head) {
     if (data_tail + sizeof(struct perf_event_header) > data_head) {
@@ -362,7 +364,9 @@ void process_aux_buffer(cpu_session_t *session) {
   // "On SMP-capable platforms, after reading the data_head value, user space
   // should issue an rmb()." The same must be done for the `aux_head`, according
   // to the docs. https://man7.org/linux/man-pages/man2/perf_event_open.2.html
+#ifdef __aarch64__
   asm volatile("dmb ishld" ::: "memory");  // memory barrier for reading
+#endif
 
   uint64_t last_processed_ts = 0;
 
