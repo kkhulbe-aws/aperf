@@ -68,10 +68,7 @@ fn main() -> Result<()> {
                 "src/hotline/tests/test_lat_map.c",
                 "src/hotline/tests/test.c",
             ])
-            .includes([
-                "src/hotline",
-                "/usr/src/linux-headers-$(uname -r)/include"
-            ])
+            .includes(["src/hotline", "/usr/src/linux-headers-$(uname -r)/include"])
             .static_flag(true)
             .flag("-Werror")
             .flag("-Wextra")
