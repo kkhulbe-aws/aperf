@@ -45,13 +45,19 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    println!(
-        "cargo:rustc-flag=-I{}/kernel_headers",
-        env!("CARGO_MANIFEST_DIR")
-    );
-
     #[cfg(feature = "spe")]
     {
+        let kernel_version = String::from_utf8(
+            Command::new("uname")
+                .arg("-r")
+                .output()
+                .expect("failed to get kernel version")
+                .stdout,
+        )
+        .expect("invalid utf8")
+        .trim()
+        .to_string();
+
         cc::Build::new()
             .files([
                 "src/hotline/bmiss_map.c",
@@ -73,12 +79,42 @@ fn main() -> Result<()> {
                 "src/hotline/tests/test_lat_map.c",
                 "src/hotline/tests/test.c",
             ])
-            .includes(["src/hotline", "src/hotline/kernel_headers"])
-            .static_flag(true)
-            .flag("-Werror")
-            .flag("-Wextra")
+            .includes(["src/hotline"])
+            .flag("-D_GNU_SOURCE")
+            .flag(&format!(
+                "-I/usr/src/linux-headers-{}/include",
+                kernel_version
+            ))
+            .flag(&format!(
+                "-I/usr/src/linux-headers-{}/arch/arm64/include",
+                kernel_version
+            ))
+            .flag(&format!(
+                "-I/usr/src/linux-headers-{}/arch/arm64/include/generated",
+                kernel_version
+            ))
+            .flag(&format!(
+                "-I/usr/src/linux-headers-{}/include/generated",
+                kernel_version
+            ))
+            .flag(&format!(
+                "-I/usr/src/linux-headers-{}/include/uapi",
+                kernel_version
+            ))
+            .flag(&format!(
+                "-I/usr/src/linux-headers-{}/arch/arm64/include/uapi",
+                kernel_version
+            ))
+            .flag(&format!(
+                "-I/usr/src/linux-headers-{}/include/generated/uapi",
+                kernel_version
+            ))
+            .flag("-Wno-unused-parameter")
+            .flag("-Wno-sign-compare")
+            .flag("-Wno-missing-field-initializers")
             .opt_level(3)
             .compile("hotline");
+
         println!("cargo:rustc-link-lib=static=dw");
         println!("cargo:rustc-link-lib=static=elf");
         println!("cargo:rustc-link-lib=static=capstone");

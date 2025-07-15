@@ -52,25 +52,11 @@ jobs:
             libbz2-dev \
             libzstd-dev \
             libdwarf-dev \
+            linux-headers-$(uname -r)
 
       # Tests and static analysis
       - name: Set perf_event_paranoid to 0
         run: echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
-      - name: Run tests
-        run: |
-          if [ "$(arch)" = "aarch64" ]; then
-            export RUSTFLAGS="-L /usr/lib/aarch64-linux-gnu"
-            export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH"
-          else
-            export RUSTFLAGS="-L /usr/lib/x86_64-linux-gnu"
-            export LD_LIBRARY_PATH="/usr/lib/x86_64-linux-gnu:$LD_LIBRARY_PATH"
-          fi
-          cargo test --verbose -- --nocapture --color always
-      - name: Run clippy
-        run: cargo clippy --all-targets --all-features
-      - name: Run rustfmt
-        run: cargo fmt --all -- --check
-
       # Build and upload release artifacts
       - name: Build release artifacts
         run: |

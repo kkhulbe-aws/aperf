@@ -9,7 +9,7 @@
 #define PERF_PACKETS_H_
 
 #include <stdint.h>
-#include <kernel_headers/linux/perf_event.h>
+#include <linux/perf_event.h>
 
 #define AUX_PACKET_TYPE_LAT 0x49
 #define AUX_PACKET_TYPE_BRANCH 0x4a

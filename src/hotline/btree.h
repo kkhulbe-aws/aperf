@@ -24,6 +24,7 @@ copies or substantial portions of the Software.
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stddef.h>
 
 struct btree;
 
