@@ -18,7 +18,7 @@ use std::os::raw::{c_char, c_int};
 use std::panic;
 
 #[cfg(feature = "spe")]
-unsafe extern "C" {
+extern "C" {
     fn hotline(argc: c_int, argv: *const *const i8) -> c_int;
     fn deserialize_maps(argc: c_int, argv: *const *const i8) -> c_int;
 }
