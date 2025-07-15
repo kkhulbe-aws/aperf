@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   CI:
+    timeout-minutes: 30 
     strategy:
       matrix:
         image: [ubuntu-24.04, ubuntu-24.04-arm]
