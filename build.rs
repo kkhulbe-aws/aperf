@@ -45,6 +45,8 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
+    println!("cargo:rustc-flag=-I{}/kernel_headers", env!("CARGO_MANIFEST_DIR"));
+
     #[cfg(feature = "spe")]
     {
         cc::Build::new()
@@ -74,7 +76,6 @@ fn main() -> Result<()> {
             .flag("-Wextra")
             .opt_level(3)
             .compile("hotline");
-
         println!("cargo:rustc-link-lib=static=dw");
         println!("cargo:rustc-link-lib=static=elf");
         println!("cargo:rustc-link-lib=static=capstone");

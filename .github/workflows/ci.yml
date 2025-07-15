@@ -52,8 +52,6 @@ jobs:
             libbz2-dev \
             libzstd-dev \
             libdwarf-dev \
-            linux-headers-generic \
-            linux-headers-$(uname -r)
 
       # Tests and static analysis
       - name: Set perf_event_paranoid to 0
