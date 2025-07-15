@@ -2,10 +2,10 @@
 #ifndef _LINUX_SWAB_H
 #define _LINUX_SWAB_H
 
-#include <linux/types.h>
-#include <linux/stddef.h>
-#include <asm/bitsperlong.h>
-#include <asm/swab.h>
+#include "types.h"
+#include "stddef.h"
+#include "../asm/bitsperlong.h"
+#include "../asm/swab.h"
 
 /*
  * casts are necessary for constants, because we never know how for sure

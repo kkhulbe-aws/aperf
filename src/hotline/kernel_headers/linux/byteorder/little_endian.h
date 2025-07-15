@@ -9,9 +9,9 @@
 #define __LITTLE_ENDIAN_BITFIELD
 #endif
 
-#include <linux/stddef.h>
-#include <linux/types.h>
-#include <linux/swab.h>
+#include "../stddef.h"
+#include "../types.h"
+#include "../swab.h"
 
 #define __constant_htonl(x) ((__be32)___constant_swab32((x)))
 #define __constant_ntohl(x) ___constant_swab32((__be32)(x))

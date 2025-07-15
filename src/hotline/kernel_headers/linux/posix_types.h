@@ -2,7 +2,7 @@
 #ifndef _LINUX_POSIX_TYPES_H
 #define _LINUX_POSIX_TYPES_H
 
-#include <linux/stddef.h>
+#include "stddef.h"
 
 /*
  * This allows for 1024 file descriptors: if NR_OPEN is ever grown

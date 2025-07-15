@@ -2,11 +2,11 @@
 #ifndef _LINUX_TYPES_H
 #define _LINUX_TYPES_H
 
-#include <asm/types.h>
+#include "../asm/types.h"
 
 #ifndef __ASSEMBLY__
 
-#include <linux/posix_types.h>
+#include "posix_types.h"
 
 
 /*

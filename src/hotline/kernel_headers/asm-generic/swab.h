@@ -2,7 +2,7 @@
 #ifndef _ASM_GENERIC_SWAB_H
 #define _ASM_GENERIC_SWAB_H
 
-#include <asm/bitsperlong.h>
+#include "../asm/bitsperlong.h"
 
 /*
  * 32 bit architectures typically (but not always) want to
