@@ -93,7 +93,7 @@ jobs:
           esac
 
       - name: Link status
-        run: ldd target/aarch64-unknown-linux-gnu/release/aperf
+        run: ldd target/$(arch)-unknown-linux-gnu/release/aperf
 
       # - name: Archive release artifacts
       #   run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
