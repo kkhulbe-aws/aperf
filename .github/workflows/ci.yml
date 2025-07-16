@@ -78,13 +78,12 @@ jobs:
             aarch64)
              sudo apt install libgcc-11-dev
              sudo apt install gcc-aarch64-linux-gnu
-             sudo apt install libc6-dev
              sudo apt install libc6-dev-arm64-cross
              dpkg -L libc6-dev-arm64-cross | grep libm.a
              ls -l /usr/lib/aarch64-linux-gnu/libm.a
              ls -l /usr/lib/aarch64-linux-gnu/libm.a
               echo "Building for aarch64 architecture"
-              cargo build --release --target aarch64-unknown-linux-gnu
+              cargo build --target aarch64-unknown-linux-gnu
               ;;
             *)
               echo "Unsupported architecture: $(arch)"

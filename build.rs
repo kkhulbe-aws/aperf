@@ -16,6 +16,11 @@ fn main() -> Result<()> {
     println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");
     println!("cargo:rustc-link-search=native=/usr/lib/gcc/aarch64-linux-gnu/11");
 
+    println!("cargo:rustc-link-search=native=/usr/aarch64-linux-gnu/lib");
+    println!("cargo:rustc-link-arg=-static");
+    println!("cargo:rustc-link-arg=-static-libgcc");
+    println!("cargo:rustc-link-arg=-static-libstdc++");
+
     match Command::new("npm").arg("install").spawn() {
         Err(_proc) => {
             println!("Build requires npm, but it was not found. Please install Node >= 16.16.0.");
@@ -114,6 +119,7 @@ fn main() -> Result<()> {
             .flag("-Wno-missing-field-initializers")
             .opt_level(3)
             .static_flag(true)
+            .static_crt(true)
             .compile("hotline");
 
         println!("cargo:rustc-link-lib=static=dw");
@@ -127,9 +133,11 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static=c");
         // println!("cargo:rustc-link-lib=static=m");
         
-        // println!("cargo:rustc-link-lib=dylib=gcc_s");
-        // println!("cargo:rustc-link-lib=dylib=dl");
-        // println!("cargo:rustc-link-lib=dylib=pthread");
+        println!("cargo:rustc-link-lib=static=c");
+        println!("cargo:rustc-link-lib=static=m");
+        println!("cargo:rustc-link-lib=static=gcc");
+        println!("cargo:rustc-link-lib=static=pthread");
+        println!("cargo:rustc-link-lib=static=dl");
         println!("Building with SPE support.");
     }
 
