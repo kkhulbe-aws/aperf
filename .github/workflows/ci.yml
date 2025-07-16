@@ -68,7 +68,7 @@ jobs:
               ;;
             aarch64)
               echo "Building for aarch64 architecture"
-              cargo build --release --target aarch64-unknown-linux-gnu
+              cargo build --no-default-features --release --target aarch64-unknown-linux-gnu
               ;;
             *)
               echo "Unsupported architecture: $(arch)"
@@ -76,17 +76,17 @@ jobs:
               ;;
           esac
 
-      - name: Archive release artifacts
-        run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
-      - name: Upload x86_64 release artifacts
-        uses: actions/upload-artifact@v4
-        if: ${{ matrix.image == 'ubuntu-24.04' }}
-        with:
-          name: x86_64-release-artifacts
-          path: artifacts.tar.gz
-      - name: Upload aarch64 release artifacts
-        uses: actions/upload-artifact@v4
-        if: ${{ matrix.image == 'ubuntu-24.04-arm' }}
-        with:
-          name: aarch64-release-artifacts
-          path: artifacts.tar.gz
+      # - name: Archive release artifacts
+      #   run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
+      # - name: Upload x86_64 release artifacts
+      #   uses: actions/upload-artifact@v4
+      #   if: ${{ matrix.image == 'ubuntu-24.04' }}
+      #   with:
+      #     name: x86_64-release-artifacts
+      #     path: artifacts.tar.gz
+      # - name: Upload aarch64 release artifacts
+      #   uses: actions/upload-artifact@v4
+      #   if: ${{ matrix.image == 'ubuntu-24.04-arm' }}
+      #   with:
+      #     name: aarch64-release-artifacts
+      #     path: artifacts.tar.gz
