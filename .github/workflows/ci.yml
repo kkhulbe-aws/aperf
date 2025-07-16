@@ -39,6 +39,8 @@ jobs:
         run: sudo apt update
       - name: Install gcc
         run: sudo apt install -y build-essential
+             sudo apt install libgcc-11-dev
+             sudo apt install gcc-aarch64-linux-gnu
       - name: Install SPE libraries
         run: |
           sudo apt install -y \
