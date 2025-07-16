@@ -54,7 +54,7 @@ jobs:
             libdwarf-dev \
             linux-headers-$(uname -r)
 
-              - name: Find unistd_64.h
+      - name: Find unistd_64.h
         run: |
           echo "Searching for unistd_64.h..."
           sudo find / -name "unistd_64.h" 2>/dev/null
