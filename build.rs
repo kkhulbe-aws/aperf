@@ -130,14 +130,20 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static=bz2");
         println!("cargo:rustc-link-lib=static=zstd");
 
-
-        // println!("cargo:rustc-link-lib=static=c");
-        // println!("cargo:rustc-link-lib=static=m");
-        // println!("cargo:rustc-link-lib=static=gcc");
-        // println!("cargo:rustc-link-lib=static=pthread");
-        // println!("cargo:rustc-link-lib=static=dl");
         println!("Building with SPE support.");
     }
+
+    // Force static linking
+    println!("cargo:rustc-link-arg=-static");
+    println!("cargo:rustc-link-arg=-static-libgcc");
+    println!("cargo:rustc-link-arg=-static-libstdc++");
+
+    // Explicitly specify static versions of system libraries
+    println!("cargo:rustc-link-arg=-Wl,--start-group");
+    println!("cargo:rustc-link-lib=static=c");
+    println!("cargo:rustc-link-lib=static=m");
+    println!("cargo:rustc-link-lib=static=pthread");
+    println!("cargo:rustc-link-arg=-Wl,--end-group");
 
     println!("cargo:rustc-link-arg=-Wl,--gc-sections");
     println!("cargo:rustc-link-arg=-Wl,--as-needed");

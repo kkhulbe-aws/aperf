@@ -51,6 +51,29 @@ jobs:
             libzstd-dev \
             libdwarf-dev \
             linux-headers-$(uname -r)
+          
+          sudo apt-get install -y \
+              libelf-dev \
+              libdw-dev \
+              libcapstone-dev \
+              zlib1g-dev \
+              liblzma-dev \
+              libbz2-dev \
+              libzstd-dev \
+              gcc-11-aarch64-linux-gnu \
+              g++-11-aarch64-linux-gnu \
+              libstdc++-11-dev \
+              libgcc-11-dev
+
+          # Static versions
+          sudo apt-get install -y \
+              libelf-static \
+              libdw-static \
+              libcapstone-static \
+              zlib1g-static \
+              liblzma-static \
+              libbz2-dev \
+              libzstd-static
 
       # - name: Find unistd_64.h
       #   run: |
@@ -73,15 +96,9 @@ jobs:
           case $(arch) in
             x86_64)
               echo "Building for x86_64 architecture"
-              cargo build --no-default-features --release --target x86_64-unknown-linux-gnu
+              cargo build --no-default-features --target x86_64-unknown-linux-gnu
               ;;
             aarch64)
-             sudo apt install libgcc-11-dev
-             sudo apt install gcc-aarch64-linux-gnu
-             sudo apt install libc6-dev-arm64-cross
-             dpkg -L libc6-dev-arm64-cross | grep libm.a
-             ls -l /usr/lib/aarch64-linux-gnu/libm.a
-             ls -l /usr/lib/aarch64-linux-gnu/libm.a
               echo "Building for aarch64 architecture"
               cargo build --target aarch64-unknown-linux-gnu
               ;;
