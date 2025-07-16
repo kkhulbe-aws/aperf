@@ -123,7 +123,7 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static=lzma");
         println!("cargo:rustc-link-lib=static=bz2");
         println!("cargo:rustc-link-lib=static=zstd");
-        println!("cargo:rustc-link-lib=static=gcc");
+        // println!("cargo:rustc-link-lib=static=gcc");
         println!("cargo:rustc-link-lib=static=c");
         println!("cargo:rustc-link-lib=static=m");
         
