@@ -28,7 +28,7 @@ jobs:
 
       # Prepare build dependencies
       - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@47f4dd75f027bd6cfe06f3dc15ddfcb07acc7e4e # 1.73.0
+        uses: dtolnay/rust-toolchain@47f4dd75f027bd6cfe06f3dc15ddfcb07acc7e4e # 1.74.0
         with:
           components: rustfmt, clippy
       - name: Install Node

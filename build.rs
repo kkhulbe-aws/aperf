@@ -81,8 +81,19 @@ fn main() -> Result<()> {
             ])
             .includes(["src/hotline"])
             .flag("-D_GNU_SOURCE")
+            // First add GCC's built-in headers
+            .flag("-isystem")
+            .flag("/usr/lib/gcc/aarch64-linux-gnu/11/include")
+            // Then add system headers
+            .flag("-isystem")
+            .flag("/usr/include")
+            .flag("-isystem")
+            .flag("/usr/local/include")
+            .flag("-isystem")
+            .flag("/usr/include/aarch64-linux-gnu")
+            // Then add kernel headers
             .flag(&format!(
-                "-I/usr/src/linux-headers-{}/include",
+                "-I/usr/src/linux-headers-{}/generated/asm",
                 kernel_version
             ))
             .flag(&format!(
@@ -90,29 +101,14 @@ fn main() -> Result<()> {
                 kernel_version
             ))
             .flag(&format!(
-                "-I/usr/src/linux-headers-{}/arch/arm64/include/generated",
-                kernel_version
-            ))
-            .flag(&format!(
-                "-I/usr/src/linux-headers-{}/include/generated",
-                kernel_version
-            ))
-            .flag(&format!(
-                "-I/usr/src/linux-headers-{}/include/uapi",
-                kernel_version
-            ))
-            .flag(&format!(
-                "-I/usr/src/linux-headers-{}/arch/arm64/include/uapi",
-                kernel_version
-            ))
-            .flag(&format!(
-                "-I/usr/src/linux-headers-{}/include/generated/uapi",
+                "-I/usr/src/linux-headers-{}/arch/arm64/include",
                 kernel_version
             ))
             .flag("-Wno-unused-parameter")
             .flag("-Wno-sign-compare")
             .flag("-Wno-missing-field-initializers")
             .opt_level(3)
+            .compiler("aarch64-linux-musl-gcc")
             .compile("hotline");
 
         println!("cargo:rustc-link-lib=static=dw");
@@ -123,6 +119,7 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static=bz2");
         println!("cargo:rustc-link-lib=static=zstd");
         println!("cargo:rustc-link-lib=dylib=dl");
+        println!("cargo:rustc-link-lib=dylib=m");
         println!("cargo:rustc-link-lib=dylib=pthread");
         println!("Building with SPE support.");
     }
