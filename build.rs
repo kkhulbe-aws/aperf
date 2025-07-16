@@ -125,11 +125,11 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static=zstd");
         // println!("cargo:rustc-link-lib=static=gcc");
         println!("cargo:rustc-link-lib=static=c");
-        println!("cargo:rustc-link-lib=static=m");
+        // println!("cargo:rustc-link-lib=static=m");
         
         // println!("cargo:rustc-link-lib=dylib=gcc_s");
-        println!("cargo:rustc-link-lib=dylib=dl");
-        println!("cargo:rustc-link-lib=dylib=pthread");
+        // println!("cargo:rustc-link-lib=dylib=dl");
+        // println!("cargo:rustc-link-lib=dylib=pthread");
         println!("Building with SPE support.");
     }
 
