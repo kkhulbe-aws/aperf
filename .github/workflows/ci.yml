@@ -60,20 +60,10 @@ jobs:
               liblzma-dev \
               libbz2-dev \
               libzstd-dev \
-              gcc-11-aarch64-linux-gnu \
-              g++-11-aarch64-linux-gnu \
+              gcc-aarch64-linux-gnu \
+              g++-aarch64-linux-gnu \
               libstdc++-11-dev \
               libgcc-11-dev
-
-          # Static versions
-          sudo apt-get install -y \
-              libelf-static \
-              libdw-static \
-              libcapstone-static \
-              zlib1g-static \
-              liblzma-static \
-              libbz2-dev \
-              libzstd-static
 
       # - name: Find unistd_64.h
       #   run: |
