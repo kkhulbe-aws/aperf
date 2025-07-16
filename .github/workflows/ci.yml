@@ -54,6 +54,17 @@ jobs:
             libdwarf-dev \
             linux-headers-$(uname -r)
 
+              - name: Find unistd_64.h
+        run: |
+          echo "Searching for unistd_64.h..."
+          sudo find / -name "unistd_64.h" 2>/dev/null
+          echo "Kernel version:"
+          uname -r
+          echo "Contents of linux-headers directory:"
+          ls -la /usr/src/linux-headers-$(uname -r)
+          echo "Contents of asm directory:"
+          ls -la /usr/src/linux-headers-$(uname -r)/arch/arm64/include/asm/ || echo "asm directory not found"
+
       # Tests and static analysis
       - name: Set perf_event_paranoid to 0
         run: echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
