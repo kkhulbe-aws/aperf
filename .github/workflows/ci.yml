@@ -92,7 +92,7 @@ jobs:
               ;;
           esac
 
-      - name: Link status:
+      - name: Link status
         run: ldd target/aarch64-unknown-linux-gnu/release/aperf
 
       # - name: Archive release artifacts
