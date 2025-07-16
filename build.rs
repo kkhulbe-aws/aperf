@@ -102,7 +102,7 @@ fn main() -> Result<()> {
                 kernel_version
             ))
             .flag(&format!(
-                "-I/usr/src/linux-headers-{}/arch/arm64/include",
+                "-I/usr/src/linux-headers-{}/arch/arm64/include/generated/uapi",
                 kernel_version
             ))
             .flag(&format!(

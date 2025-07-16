@@ -39,8 +39,6 @@ jobs:
         run: sudo apt update
       - name: Install gcc
         run: sudo apt install -y build-essential
-      - name: Install musl
-        run: sudo apt install -y musl-tools
       - name: Install SPE libraries
         run: |
           sudo apt install -y \
@@ -54,16 +52,16 @@ jobs:
             libdwarf-dev \
             linux-headers-$(uname -r)
 
-      - name: Find unistd_64.h
-        run: |
-          echo "Searching for unistd_64.h..."
-          sudo find / -name "unistd_64.h" 2>/dev/null
-          echo "Kernel version:"
-          uname -r
-          echo "Contents of linux-headers directory:"
-          ls -la /usr/src/linux-headers-$(uname -r)
-          echo "Contents of asm directory:"
-          ls -la /usr/src/linux-headers-$(uname -r)/arch/arm64/include/asm/ || echo "asm directory not found"
+      # - name: Find unistd_64.h
+      #   run: |
+      #     echo "Searching for unistd_64.h..."
+      #     sudo find / -name "unistd_64.h" 2>/dev/null
+      #     echo "Kernel version:"
+      #     uname -r
+      #     echo "Contents of linux-headers directory:"
+      #     ls -la /usr/src/linux-headers-$(uname -r)
+      #     echo "Contents of asm directory:"
+      #     ls -la /usr/src/linux-headers-$(uname -r)/arch/arm64/include/asm/ || echo "asm directory not found"
 
       # Tests and static analysis
       - name: Set perf_event_paranoid to 0
