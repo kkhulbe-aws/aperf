@@ -86,14 +86,14 @@ fn main() -> Result<()> {
             .flag("-D_GNU_SOURCE")
             // First add GCC's built-in headers
             .flag("-isystem")
+            .flag("/usr/include/aarch64-linux-gnu")
+            .flag("-isystem")
             .flag("/usr/lib/gcc/aarch64-linux-gnu/11/include")
             // Then add system headers
             .flag("-isystem")
             .flag("/usr/include")
             .flag("-isystem")
             .flag("/usr/local/include")
-            .flag("-isystem")
-            .flag("/usr/include/aarch64-linux-gnu")
             // Then add kernel headers
             .flag(&format!(
                 "-I/usr/src/linux-headers-{}/generated/asm",
