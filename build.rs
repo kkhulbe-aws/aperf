@@ -134,7 +134,7 @@ fn main() -> Result<()> {
         // println!("cargo:rustc-link-lib=static=m");
         
         println!("cargo:rustc-link-lib=static=c");
-        println!("cargo:rustc-link-lib=static=m");
+        // println!("cargo:rustc-link-lib=static=m");
         println!("cargo:rustc-link-lib=static=gcc");
         println!("cargo:rustc-link-lib=static=pthread");
         println!("cargo:rustc-link-lib=static=dl");
