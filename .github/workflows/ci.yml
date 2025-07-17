@@ -88,10 +88,11 @@ jobs:
 
               echo "Building for aarch64 architecture"
               cargo build --target aarch64-unknown-linux-gnu
-              ldd target/$(arch)-unknown-linux-gnu/debug/aperf
               ;;
             x86_64)
               echo "Building for x86_64 architecture"
+              rustup target add $(arch)-unknown-linux-gnu
+              cargo build --target $(arch)-unknown-linux-gnu
               ;;
             *)
               echo "Unsupported architecture: $(arch)"
@@ -99,6 +100,9 @@ jobs:
               ;;
           esac
 
+      - name: Link status
+        run: cargo build --target aarch64-unknown-linux-gnu
+        continue-on-error: true
       # - name: Archive release artifacts
       #   run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
       # - name: Upload x86_64 release artifacts
