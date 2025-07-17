@@ -88,6 +88,7 @@ jobs:
 
               echo "Building for aarch64 architecture"
               cargo build --target aarch64-unknown-linux-gnu
+              ldd target/$(arch)-unknown-linux-gnu/debug/aperf
               ;;
             x86_64)
               echo "Building for x86_64 architecture"
@@ -97,9 +98,6 @@ jobs:
               exit 1
               ;;
           esac
-
-      - name: Link status
-        run: ldd target/$(arch)-unknown-linux-gnu/debug/aperf
 
       # - name: Archive release artifacts
       #   run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
