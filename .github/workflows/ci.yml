@@ -111,7 +111,7 @@ jobs:
                 libstdc++-11-dev \
                 libgcc-11-dev \
                 linux-headers-$(uname -r) \
-                libc6-dev-amd64 \
+                libc6-dev \
                 gcc-multilib
 
               echo "Building for x86_64 architecture"
