@@ -13,8 +13,6 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=package-lock.json");
 
     println!("cargo:rustc-link-search=native=/usr/lib");
-    println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");
-    println!("cargo:rustc-link-search=native=/usr/lib/gcc/aarch64-linux-gnu/11");
 
     match Command::new("npm").arg("install").spawn() {
         Err(_proc) => {
@@ -50,10 +48,7 @@ fn main() -> Result<()> {
 
     #[cfg(feature = "spe")]
     {
-    println!("cargo:rustc-link-search=native=/usr/aarch64-linux-gnu/lib");
-    println!("cargo:rustc-link-arg=-static");
-    println!("cargo:rustc-link-arg=-static-libgcc");
-    println!("cargo:rustc-link-arg=-static-libstdc++");
+    println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");
 
         let kernel_version = String::from_utf8(
             Command::new("uname")
@@ -135,17 +130,13 @@ fn main() -> Result<()> {
 
     // Force static linking
     println!("cargo:rustc-link-arg=-static");
-    println!("cargo:rustc-link-arg=-static-libgcc");
-    println!("cargo:rustc-link-arg=-static-libstdc++");
-
-    // Explicitly specify static versions of system libraries
-    println!("cargo:rustc-link-arg=-Wl,--start-group");
-    println!("cargo:rustc-link-lib=static=c");
-    println!("cargo:rustc-link-lib=static=m");
-    println!("cargo:rustc-link-lib=static=pthread");
-    println!("cargo:rustc-link-arg=-Wl,--end-group");
-
     println!("cargo:rustc-link-arg=-Wl,--gc-sections");
     println!("cargo:rustc-link-arg=-Wl,--as-needed");
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        println!("cargo:rustc-link-arg=-no-pie");
+    }
+
     Ok(())
 }

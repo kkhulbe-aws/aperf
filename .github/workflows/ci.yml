@@ -93,12 +93,29 @@ jobs:
               rustup target add $(arch)-unknown-linux-gnu
               sudo apt-get update
               sudo apt-get install -y \
-                  build-essential \
-                  libc6 \
-                  libc6-dev \
-                  gcc \
-                  g++ \
-                  linux-libc-dev
+                build-essential \
+                libc6 \
+                libc6-dev \
+                gcc \
+                g++ \
+                linux-libc-dev \
+                libelf-dev \
+                libdw-dev \
+                libdw1 \
+                libcapstone-dev \
+                zlib1g-dev \
+                liblzma-dev \
+                libbz2-dev \
+                libzstd-dev \
+                libdwarf-dev \
+                libstdc++-11-dev \
+                libgcc-11-dev \
+                linux-headers-$(uname -r) \
+                libc6-dev-amd64 \
+                gcc-multilib
+
+              echo "Building for x86_64 architecture"
+              export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/lib/gcc/x86_64-linux-gnu/11:$LIBRARY_PATH
               cargo build --no-default-features --target $(arch)-unknown-linux-gnu
 
               echo "Building for x86_64 architecture"
