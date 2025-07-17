@@ -13,15 +13,15 @@ use std::ffi::CString;
 use std::os::raw::{c_char, c_int};
 use std::panic;
 
-#[cfg(feature = "spe")]
+#[cfg(feature = "hotline")]
 extern "C" {
     fn hotline(argc: c_int, argv: *const *const i8) -> c_int;
     fn deserialize_maps(argc: c_int, argv: *const *const i8) -> c_int;
 }
 
-pub static HOTLINE_FILE_NAME: &str = "spe_profile";
+pub static HOTLINE_FILE_NAME: &str = "hotline_profile";
 
-#[cfg(feature = "spe")]
+#[cfg(feature = "hotline")]
 pub mod spe_reports {
     use super::ReportParams;
     use std::error::Error;
@@ -168,7 +168,7 @@ impl HotlineRaw {
 }
 
 impl CollectData for HotlineRaw {
-    #[cfg(feature = "spe")]
+    #[cfg(feature = "hotline")]
     fn prepare_data_collector(&mut self, params: &CollectorParams) -> Result<()> {
         let args = vec![
             CString::new("hotline").unwrap(),
@@ -215,7 +215,7 @@ impl CollectData for HotlineRaw {
         }
     }
 
-    #[cfg(not(feature = "spe"))]
+    #[cfg(not(feature = "hotline"))]
     fn prepare_data_collector(&mut self, _params: &CollectorParams) -> Result<()> {
         Ok(())
     }
@@ -224,7 +224,7 @@ impl CollectData for HotlineRaw {
         Ok(())
     }
 
-    #[cfg(feature = "spe")]
+    #[cfg(feature = "hotline")]
     fn finish_data_collection(&mut self, _: &CollectorParams) -> Result<()> {
         unsafe {
             // Send SIGTERM to the process group
@@ -246,7 +246,7 @@ impl CollectData for HotlineRaw {
         Ok(())
     }
 
-    #[cfg(not(feature = "spe"))]
+    #[cfg(not(feature = "hotline"))]
     fn finish_data_collection(&mut self, _: &CollectorParams) -> Result<()> {
         Ok(())
     }
@@ -262,7 +262,7 @@ impl Hotline {
 }
 
 impl GetData for Hotline {
-    #[cfg(feature = "spe")]
+    #[cfg(feature = "hotline")]
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
         let args = vec![
             CString::new("hotline").unwrap(),
@@ -310,7 +310,7 @@ impl GetData for Hotline {
         Ok(vec![])
     }
 
-    #[cfg(not(feature = "spe"))]
+    #[cfg(not(feature = "hotline"))]
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
         Ok(vec![])
     }
@@ -330,7 +330,7 @@ impl GetData for Hotline {
 }
 
 #[ctor]
-#[cfg(feature = "spe")]
+#[cfg(feature = "hotline")]
 fn init_spe_profile() {
     let hotline_raw = HotlineRaw::new();
     let file_name = HOTLINE_FILE_NAME.to_string();

@@ -13,8 +13,28 @@ fn main() -> Result<()> {
     println!("cargo:rerun-if-changed=package-lock.json");
 
     println!("cargo:rustc-link-search=native=/usr/lib");
-    println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");
-    println!("cargo:rustc-link-search=native=/usr/lib/gcc/aarch64-linux-gnu/11");
+
+    #[cfg(target_arch = "x86_64")]
+    {
+        println!("cargo:rustc-link-search=native=/usr/lib/x86_64-linux-gnu");
+        println!("cargo:rustc-link-search=native=/usr/lib/gcc/x86_64-linux-gnu/11");
+        println!("cargo:rustc-link-search=native=/lib/x86_64-linux-gnu");
+        println!("cargo:rustc-link-search=native=/usr/lib");
+
+        // Disable PIE for x86_64
+        println!("cargo:rustc-link-arg=-no-pie");
+        println!("cargo:rustc-link-arg=-static");
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");
+        println!("cargo:rustc-link-search=native=/usr/lib/gcc/aarch64-linux-gnu/11");
+        println!("cargo:rustc-link-search=native=/usr/aarch64-linux-gnu/lib");
+        println!("cargo:rustc-link-arg=-static");
+        println!("cargo:rustc-link-arg=-static-libgcc");
+        println!("cargo:rustc-link-arg=-static-libstdc++");
+    }
 
     match Command::new("npm").arg("install").spawn() {
         Err(_proc) => {
@@ -48,25 +68,8 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    #[cfg(target_arch = "x86_64")]
+    #[cfg(feature = "hotline")]
     {
-        println!("cargo:rustc-link-search=native=/usr/lib/x86_64-linux-gnu");
-        println!("cargo:rustc-link-search=native=/usr/lib/gcc/x86_64-linux-gnu/11");
-        println!("cargo:rustc-link-search=native=/lib/x86_64-linux-gnu");
-        println!("cargo:rustc-link-search=native=/usr/lib");
-
-        // Disable PIE for x86_64
-        println!("cargo:rustc-link-arg=-no-pie");
-        println!("cargo:rustc-link-arg=-static");
-    }
-
-    #[cfg(feature = "spe")]
-    {
-        println!("cargo:rustc-link-search=native=/usr/aarch64-linux-gnu/lib");
-        println!("cargo:rustc-link-arg=-static");
-        println!("cargo:rustc-link-arg=-static-libgcc");
-        println!("cargo:rustc-link-arg=-static-libstdc++");
-
         let kernel_version = String::from_utf8(
             Command::new("uname")
                 .arg("-r")
@@ -101,19 +104,19 @@ fn main() -> Result<()> {
             ])
             .includes(["src/hotline"])
             .flag("-D_GNU_SOURCE")
-            // First add GCC's built-in headers
+            // Add GCC's built-in headers
             .flag("-isystem")
             .flag("/usr/include")
             .flag("-isystem")
             .flag("/usr/include/aarch64-linux-gnu")
             .flag("-isystem")
             .flag("/usr/lib/gcc/aarch64-linux-gnu/11/include")
-            // Then add system headers
+            // Add system headers
             .flag("-isystem")
             .flag("/usr/include")
             .flag("-isystem")
             .flag("/usr/local/include")
-            // Then add kernel headers
+            // Add kernel headers
             .flag(&format!(
                 "-I/usr/src/linux-headers-{}/generated/asm",
                 kernel_version
@@ -143,7 +146,7 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static=zstd");
         println!("cargo:rustc-link-lib=static=m");
 
-        println!("Building with SPE support.");
+        println!("Building with Hotline.");
     }
 
     // Force static linking
