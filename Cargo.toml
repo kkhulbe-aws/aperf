@@ -66,5 +66,5 @@ csv = "1.2"
 csv-to-html = "0.5.10"
 
 [features]
-default = ["spe"]
-spe = []
+default = ["hotline"]
+hotline = []

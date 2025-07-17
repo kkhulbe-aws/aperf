@@ -83,8 +83,6 @@ jobs:
       # Tests and static analysis
       - name: Set perf_event_paranoid to 0
         run: echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
-      - name: Run tests
-        run: cargo test --verbose -- --nocapture --color always
       - name: Run clippy
         run: cargo clippy --all-targets --all-features
       - name: Run rustfmt
@@ -111,6 +109,15 @@ jobs:
               exit 1
               ;;
           esac
+      - name: Run tests
+        run: |
+          case $(arch) in
+            aarch64)
+              cargo test --target $(arch)-unknown-linux-gnu --verbose -- --nocapture --color always
+              ;;
+            x86_64)
+              export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/lib/gcc/x86_64-linux-gnu/11:$LIBRARY_PATH
+              cargo test --no-default-features --target $(arch)-unknown-linux-gnu --verbose -- --nocapture --color always
 
       - name: Link status
         run: |
