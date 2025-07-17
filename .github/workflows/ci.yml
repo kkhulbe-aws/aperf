@@ -90,6 +90,7 @@ jobs:
               cargo build --release --target aarch64-unknown-linux-gnu
               ;;
             x86_64)
+              rustup target add $(arch)-unknown-linux-gnu
               sudo apt-get update
               sudo apt-get install -y \
                   build-essential \
@@ -98,7 +99,7 @@ jobs:
                   gcc \
                   g++ \
                   linux-libc-dev
-              cargo build --target aarch64-unknown-linux-gnu
+              cargo build --target $(arch)-unknown-linux-gnu
 
               echo "Building for x86_64 architecture"
               ;;
