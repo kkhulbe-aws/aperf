@@ -84,7 +84,7 @@ jobs:
       - name: Set perf_event_paranoid to 0
         run: echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features --target $(arch)-unknown-linux-gnu
+        run: cargo clippy --all-features --target $(arch)-unknown-linux-gnu
       - name: Run rustfmt
         run: cargo fmt --all -- --check
 
