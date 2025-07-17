@@ -89,6 +89,9 @@ jobs:
               echo "Building for aarch64 architecture"
               cargo build --target aarch64-unknown-linux-gnu
               ;;
+            x86_64)
+              echo "Building for x86_64 architecture"
+              ;;
             *)
               echo "Unsupported architecture: $(arch)"
               exit 1
