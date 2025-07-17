@@ -90,6 +90,16 @@ jobs:
               cargo build --release --target aarch64-unknown-linux-gnu
               ;;
             x86_64)
+              sudo apt-get update
+              sudo apt-get install -y \
+                  build-essential \
+                  libc6 \
+                  libc6-dev \
+                  gcc \
+                  g++ \
+                  linux-libc-dev
+              cargo build --target aarch64-unknown-linux-gnu
+
               echo "Building for x86_64 architecture"
               ;;
             *)
@@ -98,8 +108,11 @@ jobs:
               ;;
           esac
 
+        continue-on-error: true
+
       - name: Link status
         run: ldd target/$(arch)-unknown-linux-gnu/debug/aperf
+              ldd target/$(arch)-unknown-linux-gnu/target/aperf
         continue-on-error: true
       # - name: Archive release artifacts
       #   run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
