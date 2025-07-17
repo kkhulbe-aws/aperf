@@ -48,6 +48,18 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
+    #[cfg(target_arch = "x86_64")]
+    {
+        println!("cargo:rustc-link-search=native=/usr/lib/x86_64-linux-gnu");
+        println!("cargo:rustc-link-search=native=/usr/lib/gcc/x86_64-linux-gnu/11");
+        println!("cargo:rustc-link-search=native=/lib/x86_64-linux-gnu");
+        println!("cargo:rustc-link-search=native=/usr/lib");
+
+        // Disable PIE for x86_64
+        println!("cargo:rustc-link-arg=-no-pie");
+        println!("cargo:rustc-link-arg=-static");
+    }
+
     #[cfg(feature = "spe")]
     {
     println!("cargo:rustc-link-search=native=/usr/aarch64-linux-gnu/lib");
@@ -129,6 +141,7 @@ fn main() -> Result<()> {
         println!("cargo:rustc-link-lib=static=lzma");
         println!("cargo:rustc-link-lib=static=bz2");
         println!("cargo:rustc-link-lib=static=zstd");
+        println!("cargo:rustc-link-lib=static=m");
 
         println!("Building with SPE support.");
     }
@@ -141,7 +154,6 @@ fn main() -> Result<()> {
     // Explicitly specify static versions of system libraries
     println!("cargo:rustc-link-arg=-Wl,--start-group");
     println!("cargo:rustc-link-lib=static=c");
-    println!("cargo:rustc-link-lib=static=m");
     println!("cargo:rustc-link-lib=static=pthread");
     println!("cargo:rustc-link-arg=-Wl,--end-group");
 
