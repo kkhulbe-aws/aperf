@@ -87,7 +87,7 @@ jobs:
                 libgcc-11-dev
 
               echo "Building for aarch64 architecture"
-              cargo build --release --target aarch64-unknown-linux-gnu
+              cargo build --target aarch64-unknown-linux-gnu
               ;;
             x86_64)
               rustup target add $(arch)-unknown-linux-gnu
