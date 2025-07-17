@@ -99,7 +99,7 @@ jobs:
                   gcc \
                   g++ \
                   linux-libc-dev
-              cargo build --target $(arch)-unknown-linux-gnu
+              cargo build --no-default-features --target $(arch)-unknown-linux-gnu
 
               echo "Building for x86_64 architecture"
               ;;
@@ -113,7 +113,7 @@ jobs:
 
       - name: Link status
         run: ldd target/$(arch)-unknown-linux-gnu/debug/aperf
-              ldd target/$(arch)-unknown-linux-gnu/target/aperf
+              ldd target/$(arch)-unknown-linux-gnu/release/aperf
         continue-on-error: true
       # - name: Archive release artifacts
       #   run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
