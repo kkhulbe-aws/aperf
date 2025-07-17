@@ -48,7 +48,7 @@ fn main() -> Result<()> {
 
     #[cfg(feature = "spe")]
     {
-    println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");
+        println!("cargo:rustc-link-search=native=/usr/lib/aarch64-linux-gnu");
 
         let kernel_version = String::from_utf8(
             Command::new("uname")
