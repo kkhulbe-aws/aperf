@@ -39,7 +39,7 @@ jobs:
         run: sudo apt update
       - name: Install gcc
         run: sudo apt install -y build-essential
-      - name: Install SPE libraries
+      - name: Install Common Hotline libraries
         run: |
           sudo apt install -y \
             libdw-dev \
@@ -51,72 +51,56 @@ jobs:
             libzstd-dev \
             libdwarf-dev \
             linux-headers-$(uname -r) \
-            libc6-dev
-          
-      # - name: Find unistd_64.h
-      #   run: |
-      #     echo "Searching for unistd_64.h..."
-      #     sudo find / -name "unistd_64.h" 2>/dev/null
-      #     echo "Kernel version:"
-      #     uname -r
-      #     echo "Contents of linux-headers directory:"
-      #     ls -la /usr/src/linux-headers-$(uname -r)
-      #     echo "Contents of asm directory:"
-      #     ls -la /usr/src/linux-headers-$(uname -r)/arch/arm64/include/asm/ || echo "asm directory not found"
-
-      # Tests and static analysis
-      - name: Set perf_event_paranoid to 0
-        run: echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
-      # Build and upload release artifacts
-      - name: Build release artifacts
+            libc6-dev \
+            libstdc++-11-dev \
+            libgcc-11-dev
+      - name: Install Platform Dependent Libraries
         run: |
           case $(arch) in
             aarch64)
-            rustup target add $(arch)-unknown-linux-gnu
-            sudo apt-get install -y \
-                libelf-dev \
-                libdw-dev \
-                libcapstone-dev \
-                zlib1g-dev \
-                liblzma-dev \
-                libbz2-dev \
-                libzstd-dev \
-                gcc-aarch64-linux-gnu \
-                g++-aarch64-linux-gnu \
-                libstdc++-11-dev \
-                libgcc-11-dev
-
-              echo "Building for aarch64 architecture"
-              cargo build --target aarch64-unknown-linux-gnu
+              sudo apt-get update
+              sudo apt-get install -y \
+                  gcc-aarch64-linux-gnu \
+                  g++-aarch64-linux-gnu
               ;;
             x86_64)
-              rustup target add $(arch)-unknown-linux-gnu
               sudo apt-get update
               sudo apt-get install -y \
                 build-essential \
                 libc6 \
-                libc6-dev \
                 gcc \
                 g++ \
                 linux-libc-dev \
-                libelf-dev \
-                libdw-dev \
                 libdw1 \
-                libcapstone-dev \
-                zlib1g-dev \
-                liblzma-dev \
-                libbz2-dev \
-                libzstd-dev \
-                libdwarf-dev \
-                libstdc++-11-dev \
-                libgcc-11-dev \
-                linux-headers-$(uname -r) \
-                libc6-dev-amd64 \
                 gcc-multilib
+              ;;
+            *)
+              echo "Unsupported architecture: $(arch)"
+              exit 1
+              ;;
+          esac
 
+      # Tests and static analysis
+      - name: Set perf_event_paranoid to 0
+        run: echo 0 | sudo tee /proc/sys/kernel/perf_event_paranoid
+      - name: Run clippy
+        run: cargo clippy --all-features --target $(arch)-unknown-linux-gnu
+      - name: Run rustfmt
+        run: cargo fmt --all -- --check
+
+      # Build and upload release artifacts
+      - name: Build release artifacts
+        run: |
+          rustup target add $(arch)-unknown-linux-gnu
+          case $(arch) in
+            aarch64)
+              echo "Building for aarch64 architecture"
+              cargo build --release --target aarch64-unknown-linux-gnu
+              ;;
+            x86_64)
               echo "Building for x86_64 architecture"
               export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/lib/gcc/x86_64-linux-gnu/11:$LIBRARY_PATH
-              cargo build --no-default-features --target $(arch)-unknown-linux-gnu
+              cargo build --no-default-features --release --target $(arch)-unknown-linux-gnu
 
               echo "Building for x86_64 architecture"
               ;;
@@ -125,24 +109,46 @@ jobs:
               exit 1
               ;;
           esac
-
-        continue-on-error: true
+      - name: Run tests
+        run: |
+          case $(arch) in
+            aarch64)
+              cargo test  --no-default-features --target $(arch)-unknown-linux-gnu --verbose -- --nocapture --color always
+              ;;
+            x86_64)
+              export LIBRARY_PATH=/usr/lib/x86_64-linux-gnu:/usr/lib/gcc/x86_64-linux-gnu/11:$LIBRARY_PATH
+              cargo test --no-default-features --target $(arch)-unknown-linux-gnu --verbose -- --nocapture --color always
+              ;;
+            *)
+              echo "Unsupported architecture: $(arch)"
+              exit 1
+              ;;
+          esac
 
       - name: Link status
-        run: ldd target/$(arch)-unknown-linux-gnu/debug/aperf
-              ldd target/$(arch)-unknown-linux-gnu/release/aperf
-        continue-on-error: true
-      # - name: Archive release artifacts
-      #   run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
-      # - name: Upload x86_64 release artifacts
-      #   uses: actions/upload-artifact@v4
-      #   if: ${{ matrix.image == 'ubuntu-24.04' }}
-      #   with:
-      #     name: x86_64-release-artifacts
-      #     path: artifacts.tar.gz
-      # - name: Upload aarch64 release artifacts
-      #   uses: actions/upload-artifact@v4
-      #   if: ${{ matrix.image == 'ubuntu-24.04-arm' }}
-      #   with:
-      #     name: aarch64-release-artifacts
-      #     path: artifacts.tar.gz
+        run: |
+          set +e
+          ldd_output=$(ldd target/$(arch)-unknown-linux-gnu/release/aperf 2>&1)
+          set -e
+
+          if echo "$ldd_output" | grep -q "not a dynamic executable"; then
+              echo "Binary is statically linked."
+          else
+              echo "Error: binary is not statically linked." >&2
+              exit 1
+          fi
+
+      - name: Archive release artifacts
+        run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-gnu/release aperf
+      - name: Upload x86_64 release artifacts
+        uses: actions/upload-artifact@v4
+        if: ${{ matrix.image == 'ubuntu-22.04' }}
+        with:
+          name: x86_64-release-artifacts
+          path: artifacts.tar.gz
+      - name: Upload aarch64 release artifacts
+        uses: actions/upload-artifact@v4
+        if: ${{ matrix.image == 'ubuntu-22.04-arm' }}
+        with:
+          name: aarch64-release-artifacts
+          path: artifacts.tar.gz
