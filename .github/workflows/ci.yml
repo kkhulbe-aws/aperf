@@ -92,7 +92,7 @@ jobs:
             x86_64)
               echo "Building for x86_64 architecture"
               rustup target add $(arch)-unknown-linux-gnu
-              cargo build --target $(arch)-unknown-linux-gnu
+              cargo build --no-default-features --target $(arch)-unknown-linux-gnu
               ;;
             *)
               echo "Unsupported architecture: $(arch)"
