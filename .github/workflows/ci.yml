@@ -70,9 +70,9 @@ jobs:
       # Build and upload release artifacts
       - name: Build release artifacts
         run: |
-          rustup target add $(arch)-unknown-linux-gnu
           case $(arch) in
             aarch64)
+            rustup target add $(arch)-unknown-linux-gnu
             sudo apt-get install -y \
                 libelf-dev \
                 libdw-dev \
