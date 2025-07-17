@@ -50,7 +50,8 @@ jobs:
             libbz2-dev \
             libzstd-dev \
             libdwarf-dev \
-            linux-headers-$(uname -r)
+            linux-headers-$(uname -r) \
+            libc6-dev
           
       # - name: Find unistd_64.h
       #   run: |
