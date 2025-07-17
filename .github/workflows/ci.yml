@@ -15,7 +15,7 @@ jobs:
     timeout-minutes: 30 
     strategy:
       matrix:
-        image: [ubuntu-24.04, ubuntu-24.04-arm]
+        image: [ubuntu-22.04, ubuntu-22.04-arm]
     runs-on:
       - ${{matrix.image}}
     steps:
