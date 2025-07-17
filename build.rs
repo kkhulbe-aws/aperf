@@ -62,10 +62,10 @@ fn main() -> Result<()> {
 
     #[cfg(feature = "spe")]
     {
-    println!("cargo:rustc-link-search=native=/usr/aarch64-linux-gnu/lib");
-    println!("cargo:rustc-link-arg=-static");
-    println!("cargo:rustc-link-arg=-static-libgcc");
-    println!("cargo:rustc-link-arg=-static-libstdc++");
+        println!("cargo:rustc-link-search=native=/usr/aarch64-linux-gnu/lib");
+        println!("cargo:rustc-link-arg=-static");
+        println!("cargo:rustc-link-arg=-static-libgcc");
+        println!("cargo:rustc-link-arg=-static-libstdc++");
 
         let kernel_version = String::from_utf8(
             Command::new("uname")

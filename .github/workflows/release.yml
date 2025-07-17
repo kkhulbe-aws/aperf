@@ -11,7 +11,7 @@ jobs:
     uses: ./.github/workflows/ci.yml
   Release:
     runs-on:
-      - ubuntu-24.04
+      - ubuntu-22.04
     permissions:
       contents: write
     needs:
