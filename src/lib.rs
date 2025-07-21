@@ -564,6 +564,7 @@ pub struct InitParams {
     pub tmp_dir: PathBuf,
     pub runlog: PathBuf,
     pub perf_frequency: u32,
+    pub hotline_sample_frequency: u32,
 }
 
 impl InitParams {
@@ -604,6 +605,7 @@ impl InitParams {
             tmp_dir: PathBuf::from(APERF_TMP),
             runlog: PathBuf::new(),
             perf_frequency: 99,
+            hotline_sample_frequency: 1000,
         }
     }
 }

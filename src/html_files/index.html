@@ -15,6 +15,7 @@
 			<button class="tablinks" name="cpu_utilization">CPU Utilization</button>
 			<button class="tablinks" name="flamegraphs">Flamegraphs</button>
 			<button class="tablinks" name="top_functions">Top Functions</button>
+			<button class="tablinks" name="hotline">Hotline</button>
 			<button class="tablinks" name="processes">Processes</button>
 			<button class="tablinks" name="perfstat">PMU Stats</button>
 			<button class="tablinks" name="meminfo">Meminfo</button>
@@ -119,6 +120,79 @@
 					<div id="cpus-configure"></div>
 				</div>
 			</div>
+			<div id="hotline" class="tabcontent">
+				<div id="hotline-runs" class="extra">
+					<h1>Hotline</h1>
+					<h2>Completion Node Bins: (L1 Bound, L2 Bound, L3 Bound, DRAM Bound) </h2>
+					<div class="toggle-buttons">
+						<button onclick="loadTable('completion_node')" class="active-button">Completion Node View</button>
+						<button onclick="loadTable('execution_latency')">Execution Latency View</button>
+						<button onclick="loadTable('issue_latency')">Issue Latency View</button>
+						<button onclick="loadTable('translation_latency')">Translation Latency View</button>
+						<button onclick="loadTable('branch')">Branch View</button>
+					</div>
+					<div id="table-content">
+						<!-- The table content will be loaded here -->
+					</div>
+				</div>
+			</div>
+
+			<script>
+			function loadTable(tableType) {
+				const tableContent = document.getElementById('table-content');
+				tableContent.innerHTML = '<p>Loading...</p>'; // Show loading message
+				let fileName;
+
+				switch(tableType) {
+					case 'completion_node':
+						fileName = 'completion_node_view.html';
+						break;
+					case 'execution_latency':
+						fileName = 'execution_latency_view.html';
+						break;
+					case 'issue_latency':
+						fileName = 'issue_latency_view.html';
+						break;
+					case 'translation_latency':
+						fileName = 'translation_latency_view.html';
+						break;
+					case 'branch':
+						fileName = 'branch_view.html';
+						break;
+					default:
+						console.error('Invalid table type');
+						tableContent.innerHTML = '<p>Error: Invalid table type</p>';
+						return;
+				}
+
+				fetch(`./data/js/${fileName}`)
+					.then(response => {
+						if (!response.ok) {
+							throw new Error(`HTTP error! status: ${response.status}`);
+						}
+						return response.text();
+					})
+					.then(data => {
+						tableContent.innerHTML = data;
+					})
+					.catch(error => {
+						console.error('Error loading table content:', error);
+						tableContent.innerHTML = `<p>Error loading table: ${error.message}. Please try again.</p>`;
+					});
+
+				// Update active button
+				document.querySelectorAll('.toggle-buttons button').forEach(btn => {
+					btn.classList.remove('active-button');
+				});
+				document.querySelector(`.toggle-buttons button[onclick="loadTable('${tableType}')"]`).classList.add('active-button');
+			}
+
+			// Load completion node view by default
+			document.addEventListener('DOMContentLoaded', () => {
+				loadTable('completion_node');
+			});
+			</script>
+
 		</div>
 		<script type="text/javascript" src="data/js/runs.js"></script>
 		<script type="text/javascript" src="data/js/system_info.js"></script>
