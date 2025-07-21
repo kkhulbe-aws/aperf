@@ -56,6 +56,22 @@ jobs:
         run: |
           rustup target add $(arch)-unknown-linux-musl
           cargo build --release --target $(arch)-unknown-linux-musl
+
+      # Is not published, but ensures that Hotline can be built
+      # [hotline] tests will fail since it is not Graviton metal,
+      # but they are graceful and the test suite should pass
+      - name: Build and test dynamically linked artifacts
+        run: |
+          sudo apt-get install \
+            libdw-dev \
+            libelf-dev \
+            libcapstone-dev \
+            zlib1g-dev \
+            liblzma-dev \
+            libbz2-dev \
+            libzstd-dev
+          cargo build --release --features hotline
+          cargo test --features hotline --verbose -- --nocapture --color always
       - name: Archive release artifacts
         run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
       - name: Upload x86_64 release artifacts
