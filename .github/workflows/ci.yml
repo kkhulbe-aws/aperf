@@ -40,6 +40,16 @@ jobs:
         run: sudo apt install -y build-essential
       - name: Install musl
         run: sudo apt install -y musl-tools
+      - name: Install Hotline dependencies
+        run: |
+          sudo apt-get install \
+            libdw-dev \
+            libelf-dev \
+            libcapstone-dev \
+            zlib1g-dev \
+            liblzma-dev \
+            libbz2-dev \
+            libzstd-dev
 
       # Tests and static analysis
       - name: Set perf_event_paranoid to 0
@@ -62,14 +72,6 @@ jobs:
       # but they are graceful and the test suite should pass
       - name: Build and test dynamically linked artifacts
         run: |
-          sudo apt-get install \
-            libdw-dev \
-            libelf-dev \
-            libcapstone-dev \
-            zlib1g-dev \
-            liblzma-dev \
-            libbz2-dev \
-            libzstd-dev
           cargo build --release --features hotline
           cargo test --features hotline --verbose -- --nocapture --color always
       - name: Archive release artifacts
