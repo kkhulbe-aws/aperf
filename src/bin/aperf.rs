@@ -5,6 +5,7 @@ use aperf::report::{report, Report};
 use aperf::{PDError, APERF_RUNLOG, APERF_TMP};
 use clap::{Parser, Subcommand};
 use log::LevelFilter;
+use log::{debug, info, warn};
 use log4rs::{
     append::console::ConsoleAppender,
     append::file::FileAppender,
@@ -12,6 +13,7 @@ use log4rs::{
     encode::pattern::PatternEncoder,
     filter::threshold::ThresholdFilter,
 };
+use std::io::{self};
 use std::{fs, os::unix::fs::PermissionsExt, path::PathBuf};
 use tempfile::Builder as TempBuilder;
 
@@ -87,6 +89,50 @@ fn init_logger(verbose: u8, runlog: &PathBuf) -> Result<()> {
     Ok(())
 }
 
+pub fn check_preconditions() -> io::Result<()> {
+    // Check KPTI status
+    let cmdline = fs::read_to_string("/proc/cmdline")?;
+    let kpti_off = cmdline.contains("kpti=off");
+
+    // Check kptr_restrict
+    let kptr_value = fs::read_to_string("/proc/sys/kernel/kptr_restrict")?
+        .trim()
+        .parse::<i32>()
+        .unwrap_or(-1);
+
+    // Check perf_event_paranoid
+    let paranoid_value = fs::read_to_string("/proc/sys/kernel/perf_event_paranoid")?
+        .trim()
+        .parse::<i32>()
+        .unwrap_or(4);
+
+    // Check /proc/kallsyms readable
+    let kallsyms_readable = fs::metadata("/proc/kallsyms")
+        .map(|metadata| metadata.permissions().readonly())
+        .unwrap_or(false);
+
+    if !kallsyms_readable {
+        warn!("/proc/kallsyms is not readable");
+    }
+
+    // Check if all conditions are met
+    if !kpti_off || kptr_value != 0 || paranoid_value != -1 || !kallsyms_readable {
+        warn!("Not all preconditions are met.");
+        warn!("Please ensure:");
+        warn!("1. KPTI is disabled (add 'kpti=off' to GRUB_CMDLINE_LINUX_DEFAULT and reboot)");
+        warn!("2. echo 0 > /proc/sys/kernel/kptr_restrict");
+        warn!("3. echo -1 > /proc/sys/kernel/perf_event_paranoid");
+        warn!("4. chmod +r /proc/kallsyms");
+    } else {
+        info!("All preconditions are met.")
+    }
+
+    debug!("Preconditions check completed: kpti_off={}, kptr_value={}, paranoid_value={}, kallsyms_readable={}", 
+           kpti_off, kptr_value, paranoid_value, kallsyms_readable);
+
+    Ok(())
+}
+
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -98,6 +144,8 @@ fn main() -> Result<()> {
     let runlog = tmp_dir_path_buf.join(APERF_RUNLOG);
 
     init_logger(cli.verbose, &runlog)?;
+
+    let _ = check_preconditions();
 
     match cli.command {
         Commands::Record(r) => record(&r, &tmp_dir_path_buf, &runlog),

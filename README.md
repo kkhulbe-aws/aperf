@@ -24,6 +24,7 @@ APerf collects the following performance data:
 - Meminfo
 - Profile data (if enabled with `--profile` and `perf` binary present)
 - JVM profile data with [async-profiler](https://github.com/async-profiler/async-profiler/tree/master) binary
+- Memory and branch predictor hot spot detection (metal instance only)
 
 ## Requirements
 * [Rust toolchain (v1.61.0+)](https://www.rust-lang.org/tools/install)
@@ -36,11 +37,35 @@ Download the binary from the [Releases](https://github.com/aws/APerf/releases) p
 
 ### Building from source
 1. Download the source code from the [Releases](https://github.com/aws/APerf/releases) page.
+
 2. Run the following commands:
 
 ```
 cargo build
 cargo test
+```
+
+3. The memory and branch predictor hot spot analysis tool (hotline) is not enabled by default and requires having
+
+- Kernel drivers for SPE enabled and with appropriate permissions. This is the `arm_spe_pmu` kernel module, enabled with `CONFIG_ARM_SPE_PMU`. Only supported on Grv 3/4 *metal* instances.
+
+- The following development packages on your machine. On Debian/Ubuntu systems, you can use 
+```bash
+sudo apt-get install \
+    libdw-dev \
+    libelf-dev \
+    libcapstone-dev \
+    zlib1g-dev \
+    liblzma-dev \
+    libbz2-dev \
+    libzstd-dev
+```
+- Ensure `GRUB_CMDLINE_LINUX_DEFAULT="kpti=off"`, `kptr_restrict=0`, and `perf_event_paranoid=-1`. You may need to `sudo update-grub` and `sudo reboot` after updating `kpti=off`.
+
+4. To build with Hotline, run
+```
+cargo build --features hotline
+cargo test --features hotline
 ```
 
 ## Usage
@@ -59,6 +84,7 @@ echo 100 | sudo tee /sys/devices/*/perf_event_mux_interval_ms
 2. Start `aperf record`:
 ```
 ./aperf record -r <RUN_NAME> -i <INTERVAL_NUMBER> -p <COLLECTION_PERIOD>
+            [--hotline-sample-frequency <HOTLINE_SAMPLE_FREQUENCY>]  # Optional: if Hotline is enabled
 ```
 
 **aperf report**
@@ -80,6 +106,7 @@ To compare the results of two different performance runs, use the following comm
 ```
 ./aperf custom-pmu
 ```
+
 ### Example
 To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 
@@ -108,6 +135,8 @@ To see a step-by-step example, please see our example [here](./EXAMPLE.md)
 `-F, --perf-frequency` frequency for perf profiling in Hz (default 99)
 
 `--profile-java` profile JVMs by PID or name using async-profiler (default profiles all JVMs)
+
+`--hotline-sample-frequency` Hotline sampling period (Hz) **[hotline tool]** (default is 1Khz)
 
 `./aperf record -h`
 

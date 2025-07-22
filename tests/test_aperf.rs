@@ -3,11 +3,17 @@ use aperf::record::{record, Record};
 use aperf::report::{report, Report};
 use aperf::APERF_RUNLOG;
 use flate2::read::GzDecoder;
+use libc::c_int;
 use serial_test::serial;
 use std::path::{Path, PathBuf};
 use std::{fs, panic};
 use tar::Archive;
 use tempfile::TempDir;
+
+#[cfg(feature = "spe")]
+extern "C" {
+    fn test_all() -> c_int;
+}
 
 fn run_test<T>(test_func: T)
 where
@@ -23,6 +29,15 @@ where
     aperf_tmp.close().unwrap();
     if let Err(e) = result {
         panic::resume_unwind(e);
+    }
+}
+
+#[test]
+#[serial]
+#[cfg(feature = "spe")]
+fn test_hotline() {
+    unsafe {
+        test_all();
     }
 }
 
@@ -63,6 +78,7 @@ fn record_with_name(run: String, tempdir: &Path, aperf_tmp: &Path) -> Result<Str
         perf_frequency: 99,
         profile_java: None,
         pmu_config: None,
+        hotline_sample_frequency: 1000,
     };
     let runlog = tempdir.join(APERF_RUNLOG);
     fs::File::create(&runlog).unwrap();
