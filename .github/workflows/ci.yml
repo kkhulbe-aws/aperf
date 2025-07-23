@@ -61,20 +61,20 @@ jobs:
       - name: Run rustfmt
         run: cargo fmt --all -- --check
 
-      # Build and upload release artifacts
-      - name: Build release artifacts
-        run: |
-          rustup target add $(arch)-unknown-linux-musl
-          cargo build --release --target $(arch)-unknown-linux-musl
-
-      # Is not published, but ensures that Hotline can be built
+      # Is not put in artifacts, but ensures that Hotline can be built
       # [hotline] tests will fail since it is not Graviton metal,
       # but they are graceful and the test suite should pass
       - name: Build and test dynamically linked artifacts
         run: |
           cargo build --release --features hotline
           cargo test --features hotline --verbose -- --nocapture --color always
-          
+
+      # Build and upload release artifacts
+      - name: Build release artifacts
+        run: |
+          rustup target add $(arch)-unknown-linux-musl
+          cargo build --release --target $(arch)-unknown-linux-musl
+
       - name: Link status
         run: |
           output=$(ldd target/$(arch)-unknown-linux-musl/release/aperf 2>&1)
