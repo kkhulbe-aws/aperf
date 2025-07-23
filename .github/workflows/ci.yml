@@ -77,7 +77,7 @@ jobs:
           
       - name: Link status
         run: |
-          output=$(ldd target/$(arch)-unknown-linux-gnu/release/aperf 2>&1)
+          output=$(ldd target/$(arch)-unknown-linux-musl/release/aperf 2>&1)
           if [[ $output == *"not a dynamic executable"* ]]; then
             echo "Static executable confirmed"
             exit 0
