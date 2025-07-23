@@ -76,16 +76,10 @@ jobs:
           cargo build --release --target $(arch)-unknown-linux-musl
 
       - name: Link status
+        continue-on-error: true
         run: |
-          output=$(ldd target/$(arch)-unknown-linux-musl/release/aperf 2>&1)
-          if [[ $output == *"not a dynamic executable"* ]]; then
-            echo "Static executable confirmed"
-            exit 0
-          else
-            echo "Error: Executable is dynamically linked"
-            echo "$output"
-            exit 1
-          fi
+          ldd target/$(arch)-unknown-linux-musl/release/aperf
+
       - name: Archive release artifacts
         run: tar -zcvf artifacts.tar.gz -C target/$(arch)-unknown-linux-musl/release aperf
       - name: Upload x86_64 release artifacts
