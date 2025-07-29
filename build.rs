@@ -40,9 +40,6 @@ fn main() -> Result<()> {
         std::process::exit(1);
     }
 
-    #[cfg(all(feature = "hotline", not(target_arch = "aarch64")))]
-    compile_error!("The 'hotline' feature is only supported on aarch64 architecture");
-
     #[cfg(all(feature = "hotline", target_arch = "aarch64"))]
     {
         println!("cargo:rerun-if-changed=src/hotline/*");

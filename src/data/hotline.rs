@@ -129,7 +129,7 @@ pub mod hotline_reports {
     ];
 
     pub fn generate_reports(params: &ReportParams) -> Result<(), Box<dyn Error>> {
-        generate_html_files(params).unwrap();
+        generate_html_files(params)?;
         Ok(())
     }
 
