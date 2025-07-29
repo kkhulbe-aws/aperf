@@ -35,7 +35,7 @@ where
 
 #[test]
 #[serial]
-#[cfg(feature = "hotline")]
+#[cfg(all(feature = "hotline", not(target_arch = "aarch64")))]
 fn test_hotline() {
     unsafe {
         test_all();

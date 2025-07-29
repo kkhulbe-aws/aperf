@@ -72,7 +72,6 @@ jobs:
       # but they are graceful and the test suite should pass
       - name: Build and test dynamically linked artifacts
         run: |
-          cargo build --release --features hotline
           cargo test --features hotline --verbose -- --nocapture --color always
           
       - name: Ensure no runtime dependencies
