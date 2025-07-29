@@ -25,7 +25,7 @@ use {
     },
 };
 
-#[cfg(all(feature = "hotline", target_arch = "aarch64"))]
+#[cfg(feature = "hotline")]
 extern "C" {
     fn hotline(argc: c_int, argv: *const *const i8) -> c_int;
     fn deserialize_maps(argc: c_int, argv: *const *const i8) -> c_int;
@@ -33,7 +33,7 @@ extern "C" {
 
 pub static HOTLINE_FILE_NAME: &str = "hotline_profile";
 
-#[cfg(all(feature = "hotline", target_arch = "aarch64"))]
+#[cfg(feature = "hotline")]
 pub fn check_preconditions() -> Result<bool> {
     let mut all_conditions_met = true;
 
@@ -92,7 +92,7 @@ pub fn check_preconditions() -> Result<bool> {
     }
 }
 
-#[cfg(all(feature = "hotline", target_arch = "aarch64"))]
+#[cfg(feature = "hotline")]
 pub mod hotline_reports {
     use super::ReportParams;
     use std::error::Error;
@@ -187,7 +187,7 @@ impl HotlineRaw {
 }
 
 impl CollectData for HotlineRaw {
-    #[cfg(all(feature = "hotline", target_arch = "aarch64"))]
+    #[cfg(feature = "hotline")]
     fn prepare_data_collector(&mut self, params: &CollectorParams) -> Result<()> {
         match check_preconditions() {
             Ok(false) => {
@@ -253,7 +253,7 @@ impl CollectData for HotlineRaw {
         Ok(())
     }
 
-    #[cfg(all(feature = "hotline", target_arch = "aarch64"))]
+    #[cfg(feature = "hotline")]
     fn finish_data_collection(&mut self, params: &CollectorParams) -> Result<()> {
         if !self.launched {
             return Ok(());
@@ -331,7 +331,7 @@ impl Hotline {
 }
 
 impl GetData for Hotline {
-    #[cfg(all(feature = "hotline", target_arch = "aarch64"))]
+    #[cfg(feature = "hotline")]
     fn custom_raw_data_parser(&mut self, params: ReportParams) -> Result<Vec<ProcessedData>> {
         match hotline_reports::generate_reports(&params) {
             Ok(_) => (),
@@ -356,7 +356,7 @@ impl GetData for Hotline {
 }
 
 #[ctor]
-#[cfg(all(feature = "hotline", target_arch = "aarch64"))]
+#[cfg(feature = "hotline")]
 fn init_hotline_profile() {
     let hotline_raw = HotlineRaw::new();
     let file_name = HOTLINE_FILE_NAME.to_string();

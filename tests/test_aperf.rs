@@ -3,7 +3,7 @@ use aperf::record::{record, Record};
 use aperf::report::{report, Report};
 use aperf::APERF_RUNLOG;
 use flate2::read::GzDecoder;
-#[cfg(all(feature = "hotline", not(target_arch = "aarch64")))]
+#[cfg(feature = "hotline")]
 use libc::c_int;
 use serial_test::serial;
 use std::path::{Path, PathBuf};
@@ -11,7 +11,7 @@ use std::{fs, panic};
 use tar::Archive;
 use tempfile::TempDir;
 
-#[cfg(all(feature = "hotline", not(target_arch = "aarch64")))]
+#[cfg(feature = "hotline")]
 extern "C" {
     fn test_all() -> c_int;
 }
@@ -35,7 +35,7 @@ where
 
 #[test]
 #[serial]
-#[cfg(all(feature = "hotline", not(target_arch = "aarch64")))]
+#[cfg(feature = "hotline")]
 fn test_hotline() {
     unsafe {
         test_all();
